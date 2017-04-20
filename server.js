@@ -1,9 +1,10 @@
 const express = require('express');
 const MongoClient = require('mongodb').MongoClient;
+const config = require('./config');
 
 const app = express();
 
-MongoClient.connect(process.env.MONGO_CONNECTION, (err, db) => {
+MongoClient.connect(config.mongo.connectionString, (err, db) => {
   if (err) throw err;
   app.locals.mongo = db;
 });
