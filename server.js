@@ -1,12 +1,24 @@
 const express = require('express');
 const MongoClient = require('mongodb').MongoClient;
+const mysql = require('mysql');
 const config = require('./config');
 
 const app = express();
 
+//подключение mongo
 MongoClient.connect(config.mongo.connectionString, (err, db) => {
   if (err) throw err;
   app.locals.mongo = db;
+});
+
+//подключение mysql
+app.locals.mysql = mysql.createPool({
+    connectionLimit : 100,
+    host     : config.mysql.server,
+    user     : config.mysql.username,
+    password : config.mysql.password,
+    database : config.mysql.name,
+    debug    :  false
 });
 
 app.set('port', (process.env.PORT || 3000));
@@ -39,6 +51,23 @@ app.get('/test', (req, res) =>{
   res.send('Done');
 });
 
+
+app.get('/mysql', (req, res) => {
+  let db = app.locals.mysql;
+
+  db.getConnection(function(err,connection){
+
+    connection.query("select * from test", (err,rows) => {
+      connection.release();
+      if(!err) {
+        res.json(rows);
+      } else {
+        res.json({error: true});
+      } 
+    }); 
+
+  });
+});
 
 app.listen(app.get('port'), function() {
   console.log('Node app is running on port', app.get('port'));
