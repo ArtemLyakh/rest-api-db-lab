@@ -2,6 +2,7 @@ const express = require('express');
 const MongoClient = require('mongodb').MongoClient;
 const mysql = require('mysql');
 const config = require('./config');
+const mongoRouter = require('./db/mongo/routes.js');
 
 const app = express();
 
@@ -68,6 +69,10 @@ app.get('/mysql', (req, res) => {
 
   });
 });
+
+app.use('/mongo', mongoRouter);
+
+
 
 app.listen(app.get('port'), function() {
   console.log('Node app is running on port', app.get('port'));

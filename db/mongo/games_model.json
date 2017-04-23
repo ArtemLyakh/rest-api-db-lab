@@ -1,0 +1,34 @@
+{
+    "name": {
+        "required": true,
+        "type": "string",
+        "sortable": true,
+        "filterable": true
+    },
+    "genre": {
+        "required": false,
+        "type": "string",
+        "sortable": true,
+        "filterable": true
+    },
+    "rating": {
+        "required": false,
+        "type": "number",
+        "sortable": true,
+        "filterable": true
+    },
+    "platforms": {
+        "required": false,
+        "type": "array",
+        "elements": [
+            {
+                "name": "_id",
+                "type": "string"
+            },
+            {
+                "name": "name",
+                "type": "string"
+            }
+        ]
+    }
+}
