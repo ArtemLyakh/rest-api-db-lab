@@ -1,0 +1,17 @@
+{
+    "name": {
+        "required": true,
+        "type": "string",
+        "sortable": true,
+        "filterable": true
+    },
+    "password": {
+        "required": true,
+        "type": "string",
+        "sortable": false,
+        "filterable": false
+    },
+    "libraries": {
+        "type": "array"
+    }
+}

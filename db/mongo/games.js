@@ -10,7 +10,7 @@ router.get('/', (req, res) => {
 
     if (req.query.sort) {
         if (typeof(model[req.query.sort]) == "undefined") {
-            errors.push('Parametr #sort# is invalid');
+            errors.push('Parameter #sort# is invalid');
         } else {
             sortKey = req.query.sort;
             if (req.query.direction === "desc") {
@@ -18,7 +18,7 @@ router.get('/', (req, res) => {
             } else if (!req.query.direction || req.query.direction === "asc") {
                 sort[sortKey] = 1;
             } else {
-                errors.push('Parametr #direction# is invalid');
+                errors.push('Parameter #direction# is invalid');
             }
         }
     }
@@ -87,12 +87,14 @@ router.put('/', (req, res) => {
     let errors = [];
 
     for (let key in model) {
+        let type = model[key].type;
+
         if (type == "array") {
             obj[key] = [];
             continue;
         }
 
-        let type = model[key].type;
+        
         let required = model[key].required;
 
         if (required && !req.body[key]){
