@@ -1,7 +1,7 @@
 const router = require('express').Router();
 const bodyParser = require('body-parser');
 const functions = require('./functions');
-const game = require('./games');
+const gamesRouter = require('./games');
 const platformsRouter = require('./platforms');
 
 router.use(bodyParser.json());
@@ -12,11 +12,9 @@ router.get('/', (req, res) => {
 
 router.post('/reset', functions.resetDB);
 
-router.route('/games')
-    .get(game.get)
-    .put(game.put);
 
 router.use('/platforms', platformsRouter);
+router.use('/games', gamesRouter);
 
 
 module.exports = router;

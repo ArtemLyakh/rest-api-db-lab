@@ -18,17 +18,6 @@
         "filterable": true
     },
     "platforms": {
-        "required": false,
-        "type": "array",
-        "elements": [
-            {
-                "name": "_id",
-                "type": "string"
-            },
-            {
-                "name": "name",
-                "type": "string"
-            }
-        ]
+        "type": "array"
     }
 }

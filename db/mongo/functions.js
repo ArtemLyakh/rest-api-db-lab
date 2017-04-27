@@ -1,5 +1,3 @@
-const initGames = require('./games_init');
-
 module.exports.resetDB = (req, res) => {
     let db = req.app.locals.mongo;
     let platforms, games;
@@ -56,12 +54,20 @@ module.exports.resetDB = (req, res) => {
                 rating: 97,
                 platforms: [
                     {
-                        _id: pc,
-                        name: "PC"
+                        platform: {
+                            _id: pc,
+                            name: "PC"
+                        },
+                        price: 2000,
+                        release: 1493319189
                     },
                     {
-                        _id: ps4,
-                        name: "PlayStation 4"
+                        platform: {
+                            _id: ps4,
+                            name: "PlayStation 4"
+                        },
+                        price: 2500,
+                        release: 1493319189
                     }
                 ]
             });
@@ -78,12 +84,19 @@ module.exports.resetDB = (req, res) => {
                 rating: 95,
                 platforms: [
                     {
-                        _id: pc,
-                        name: "PC"
+                        platform: {
+                            _id: pc,
+                            name: "PC"
+                        },
+                        price: 1500
                     },
                     {
-                        _id: ps4,
-                        name: "PlayStation 4"
+                        platform: {
+                            _id: ps4,
+                            name: "PlayStation 4"
+                        },
+                        price: 2000,
+                        release: 1493319189
                     }
                 ]
             });
@@ -100,8 +113,12 @@ module.exports.resetDB = (req, res) => {
                 rating: 97,
                 platforms: [
                     {
-                        _id: ps4,
-                        name: "PlayStation 4"
+                        platform: {
+                            _id: ps4,
+                            name: "PlayStation 4"
+                        },
+                        price: 2500,
+                        release: 1493319189
                     }
                 ]
             });

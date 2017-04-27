@@ -61,7 +61,7 @@ router.get('/:id', (req, res) => {
     let db = req.app.locals.mongo;
 
     if (!ObjectId.isValid(req.params.id)){
-        res.status(400).send("Id is invalid");
+        res.status(400).send({error: "Id is invalid"});
         return;
     }
 
@@ -85,11 +85,9 @@ router.put('/', (req, res) => {
     let obj = {};
     let errors = [];
 
-    for (var key in model) {
+    for (let key in model) {
         let type = model[key].type;
         let required = model[key].required;
-
-        if (type == "object" || type == "array") continue;
 
         if (required && !req.body[key]){
             errors.push(`Field ${key} is required`);
@@ -123,7 +121,7 @@ router.delete('/:id', (req, res) => {
     let db = req.app.locals.mongo;
 
     if (!ObjectId.isValid(req.params.id)){
-        res.status(400).send("Id is invalid");
+        res.status(400).send({error: "Id is invalid"});
         return;
     }
 
@@ -149,14 +147,13 @@ router.patch('/:id', (req, res) => {
     let errors = [];
 
     if (!ObjectId.isValid(req.params.id)){
-        res.status(400).send("Id is invalid");
+        res.status(400).send({errros: "Id is invalid"});
         return;
     }
     let id = new ObjectId.ObjectID(req.params.id);
 
     for (var key in model) {
         let type = model[key].type;
-        if (type == "object" || type == "array") continue;
 
         if (req.body[key] && typeof(req.body[key]) != type){
             errors.push(`Field ${key} have to be a ${type}`);
@@ -172,7 +169,11 @@ router.patch('/:id', (req, res) => {
     
     db.collection('platforms').updateOne({_id: id}, {$set: obj})
         .then(result => {
-            res.send({success: true});
+            if (result.modifiedCount == 0) {
+                res.status(404).send({success: false});
+            } else {
+                res.send({success: true});
+            }  
         })
         .catch(error => {
             if (error.code == 11000) {
