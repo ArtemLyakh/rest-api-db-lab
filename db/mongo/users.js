@@ -72,7 +72,7 @@ router.get('/:id', (req, res) => {
     db.collection('users').findOne({_id: id})
         .then(result => {
             if (!result) {
-                res.status(404).send({success: false});
+                res.status(404).send({error: "User not found"});
             } else {
                 res.send(result);
             }
@@ -142,7 +142,7 @@ router.delete('/:id', (req, res) => {
     db.collection('users').deleteOne({_id: id})
         .then(result => {
             if (result.deletedCount === 0) {
-                res.status(404).send({success: false});
+                res.status(404).send({error: "User not found"});
             } else {
                 res.send({success: true});
             }
@@ -187,7 +187,7 @@ router.patch('/:id', (req, res) => {
     db.collection('users').updateOne({_id: id}, {$set: obj})
         .then(result => {
             if (result.matchedCount == 0) {
-                res.status(404).send({success: false});
+                res.status(404).send({error: "User not found"});
             } else {
                 res.send({success: true});
             }          
@@ -205,229 +205,172 @@ router.patch('/:id', (req, res) => {
 
 
 
-// router.get('/:id/platforms', (req, res) => {
-//     let db = req.app.locals.mongo;
+router.get('/:id/libraries', (req, res) => {
+    let db = req.app.locals.mongo;
 
-//     if (!ObjectId.isValid(req.params.id)){
-//         res.status(400).send({error: "Id is invalid"});
-//         return;
-//     }
+    if (!ObjectId.isValid(req.params.id)){
+        res.status(400).send({error: "Id is invalid"});
+        return;
+    }
 
-//     let id = new ObjectId.ObjectID(req.params.id);
+    let id = new ObjectId.ObjectID(req.params.id);
 
-//     db.collection('games').findOne({_id: id})
-//         .then(result => {
-//             if (!result) {
-//                 res.status(404).send({success: false});
-//             } else {
-//                 res.send(result.platforms);
-//             }
-//         })
-//         .catch(error => {
-//             res.status(500).send({error});
-//         });
-// });
+    db.collection('users').findOne({_id: id})
+        .then(result => {
+            if (!result) {
+                res.status(404).send({error: "User not found"});
+            } else {
+                res.send(result.libraries);
+            }
+        })
+        .catch(error => {
+            res.status(500).send({error});
+        });
+});
 
-// router.get('/:id/platforms/:idp', (req, res) => {
-//     let db = req.app.locals.mongo;
+router.get('/:id/libraries/:idp', (req, res) => {
+    let db = req.app.locals.mongo;
 
-//     if (!ObjectId.isValid(req.params.id) || !ObjectId.isValid(req.params.idp)) {
-//         res.status(400).send({error: "Id is invalid"});
-//         return;
-//     }
+    if (!ObjectId.isValid(req.params.id) || !ObjectId.isValid(req.params.idp)) {
+        res.status(400).send({error: "Id is invalid"});
+        return;
+    }
 
-//     let id = new ObjectId.ObjectID(req.params.id);
-//     let idp = new ObjectId.ObjectID(req.params.idp);
+    let id = new ObjectId.ObjectID(req.params.id);
+    let idp = new ObjectId.ObjectID(req.params.idp);
 
-//     db.collection('games').findOne({_id: id})
-//         .then(result => {
-//             if (!result) {
-//                 res.status(404).send({error: "Game not found"});
-//             } else {
-//                 let platform = null;
-//                 result.platforms.forEach((el, i, arr) => {
-//                     if (el.platform && el.platform._id == req.params.idp) {
-//                         platform = el;
-//                     }
-//                 });
-//                 if (platform == null) {
-//                     res.status(404).send({success: false});
-//                 } else {
-//                    res.send(platform);
-//                 }               
-//             }
-//         })
-//         .catch(error => {
-//             res.status(500).send({error});
-//         });
-// });
+    db.collection('users').findOne({_id: id})
+        .then(result => {
+            if (!result) {
+                res.status(404).send({error: "User not found"});
+            } else {
+                let library = null;
+                result.libraries.forEach((el, i, arr) => {
+                    if (el.platform && el.platform._id == req.params.idp) {
+                        library = el;
+                    }
+                });
+                if (library == null) {
+                    res.status(404).send({error: "Library not found"});
+                } else {
+                   res.send(library);
+                }               
+            }
+        })
+        .catch(error => {
+            res.status(500).send({error});
+        });
+});
 
-// router.put('/:id/platforms', (req, res) => {
-//     let db = req.app.locals.mongo;
+router.put('/:id/libraries', (req, res) => {
+    let db = req.app.locals.mongo;
 
-//     if (!ObjectId.isValid(req.params.id)) {
-//         res.status(400).send({error: "Id is invalid"});
-//         return;
-//     }
+    if (!ObjectId.isValid(req.params.id)) {
+        res.status(400).send({error: "Id is invalid"});
+        return;
+    }
 
-//     let id = new ObjectId.ObjectID(req.params.id);
+    let id = new ObjectId.ObjectID(req.params.id);
 
-//     let errors = [];
-//     if (!req.body.platform) {
-//         errors.push("Parametr #platform# is required");
-//     }
-//     if (ObjectId.isValid(req.body.platform && !req.body.platform)) {
-//         errors.push(`Platform id: ${req.body.platform} is invalid`);
-//     }
-//     if (req.body.price && (typeof(req.body.price) != "number" || req.body.price < 0)) {
-//         errors.push("Parametr #price# is invalid");
-//     }
-//     if (req.body.release && (typeof(req.body.release) != "number" || req.body.release < 0)) {
-//         errors.push("Parametr #release# is invalid");
-//     }
-
-//     if (errors.length > 0) {
-//         res.status(400).send({errors});
-//         return;
-//     }
+    if (!req.body.platform) {
+        res.status(400).send({error: "Parameter #platform# is required"});
+        return;
+    }
+    if (!ObjectId.isValid(req.body.platform)) {
+        res.status(400).send({error: `Platform id: ${req.body.platform} is invalid`});
+        return;
+    }
     
-//     let platformId = new ObjectId.ObjectID(req.body.platform);
+    let platformId = new ObjectId.ObjectID(req.body.platform);
 
-//     db.collection('platforms').findOne({_id: platformId})
-//         .then(result => {
-//             if (!result) {
-//                 res.status(404).send({error: "Platforms not found"});
-//             } else {
-//                 let obj = {
-//                     platform: {
-//                         _id: result._id,
-//                         name: result.name
-//                     }
-//                 }
-//                 if (req.body.price) obj.price = req.body.price;
-//                 if (req.body.release) obj.release = req.body.release;
+    db.collection('users').findOne({_id: id})
+        .then(result => {
+            if (!result) {
+                throw {code: 404, data: {error: "User not found"}};
+            } else {
+                let exist = false;
+                result.libraries.forEach(el => {
+                    if (el.platform && el.platform._id == req.body.platform) {
+                        exist = true;
+                    }
+                });
 
-//                 db.collection('games').updateOne({_id: id}, {$addToSet: {platforms: obj}})
-//                     .then(result => {
-//                         if (result.matchedCount == 0) {
-//                             res.status(404).send({error: "Game not found"});
-//                         } else {
-//                             res.send({success: true});
-//                         }
-//                     })
-//                     .catch(error => {
-//                         res.status(500).send({error});
-//                     });
-//             }
-//         })
-//         .catch(error => {
-//             res.status(500).send({error});
-//         });
+                if (exist) {
+                    throw {code: 400, data: {error: "Platform already exists"}};
+                } else {
+                    return db.collection('platforms').findOne({_id: platformId});
+                }
+            }
+        })
+        .then(result => {
+            if (result == null) {
+                throw {code: 404, data: {error: "Platform not found"}};
+            } else {
+                let obj = {
+                    platform: {
+                        _id: req.body.platform,
+                        name: result.name
+                    },
+                    games: []
+                };
+                return db.collection('users').updateOne({_id: id}, {$addToSet: {libraries: obj}});
+            }
+        })
+        .then(result => {
+            res.send({success: true});
+        })
+        .catch(error => {
+            if (error.code) {
+                res.status(error.code).send(error.data);
+            } else {
+                res.status(500).send({error});
+            }            
+        });
 
+});
 
-// });
+router.delete('/:id/libraries/:idp', (req, res) => {
+    let db = req.app.locals.mongo;
 
-// router.delete('/:id/platforms/:idp', (req, res) => {
-//     let db = req.app.locals.mongo;
+    if (!ObjectId.isValid(req.params.id) || !ObjectId.isValid(req.params.idp)) {
+        res.status(400).send({error: "Id is invalid"});
+        return;
+    }
 
-//     if (!ObjectId.isValid(req.params.id) || !ObjectId.isValid(req.params.idp)) {
-//         res.status(400).send({error: "Id is invalid"});
-//         return;
-//     }
+    let id = new ObjectId.ObjectID(req.params.id);
+    let idp = new ObjectId.ObjectID(req.params.idp);
 
-//     let id = new ObjectId.ObjectID(req.params.id);
-//     let idp = new ObjectId.ObjectID(req.params.idp);
-
-//     db.collection('games').findOne({_id: id})
-//         .then(result => {
-//             if (!result) {
-//                 res.status(404).send({error: "Game not found"});
-//             } else {
-//                 let platforms = [];
-//                 result.platforms.forEach(el => {
-//                     if (!el.platform || !el.platform._id.equals(idp)) {
-//                         platforms.push(el);
-//                     }
-//                 });
-//                 if (result.platforms.length === platforms.length) {
-//                     res.status(404).send({error: "Platform not found"});
-//                 } else {
-//                     db.collection('games').updateOne({_id: id}, {platforms})
-//                         .then(result => {
-//                             res.send({success: true});
-//                         })
-//                         .catch(error => {
-//                             res.status(500).send({error});
-//                         });
-//                 }
-//             }
-            
-//         })
-//         .catch(error => {
-//             res.status(500).send({error});
-//         });
-// });
-
-// router.patch('/:id/platforms/:idp', (req, res) => {
-//     let db = req.app.locals.mongo;
-
-//     if (!ObjectId.isValid(req.params.id) || !ObjectId.isValid(req.params.idp)) {
-//         res.status(400).send({error: "Id is invalid"});
-//         return;
-//     }
-
-//     let id = new ObjectId.ObjectID(req.params.id);
-//     let idp = new ObjectId.ObjectID(req.params.idp);
-
-//     let errors = [];
-//     if (req.body.price && (typeof(req.body.price) != "number" || req.body.price < 0)) {
-//         errors.push("Parametr #price# is invalid");
-//     }
-//     if (req.body.release && (typeof(req.body.release) != "number" || req.body.release < 0)) {
-//         errors.push("Parametr #release# is invalid");
-//     }
-
-//     if (errors.length > 0) {
-//         res.status(400).send({errors});
-//         return;
-//     }
-    
-//     db.collection('games').findOne({_id: id})
-//         .then(result => {
-//             if (!result) {
-//                 res.status(404).send({error: "Game not found"});
-//             } else {
-//                 let platforms = [];
-//                 let found = false;
-//                 result.platforms.forEach(el => {
-//                     if (el.platform && el.platform._id.equals(idp)) {
-//                         if (req.body.price) el.price = req.body.price;
-//                         if (req.body.release) el.release = req.body.release;
-//                         platforms.push(el);
-//                         found = true;
-//                     } else {
-//                         platforms.push(el);
-//                     }
-//                 });
-//                 if (!found) {
-//                     res.status(404).send({error: "Platform not found"});
-//                 } else {
-//                     db.collection('games').updateOne({_id: id}, {platforms})
-//                         .then(result => {
-//                             res.send({success: true});
-//                         })
-//                         .catch(error => {
-//                             res.status(500).send({error});
-//                         });
-//                 }
-//             }
-            
-//         })
-//         .catch(error => {
-//             res.status(500).send({error});
-//         });
+    db.collection('users').findOne({_id: id})
+        .then(result => {
+            if (!result) {
+                throw {code: 404, data: {error: "User not found"}};
+            } else {
+                let libraries = [];
+                result.libraries.forEach(el => {
+                    if (!el.platform || !el.platform._id == req.params.idp) {
+                        libraries.push(el);
+                    }
+                });
+                if (result.libraries.length === libraries.length) {
+                    throw {code: 404, data: {error: "Platform not found"}};
+                } else {
+                    return db.collection('users').updateOne({_id: id}, {libraries});
+                }
+            }
+        })
+        .then(result => {
+            res.send({success: true});
+        })
+        .catch(error => {
+            if (error.code) {
+                res.status(error.code).send(error.data);
+            } else {
+                res.status(500).send({error});
+            } 
+        });
+});
 
 
-// });
+
 
 module.exports = router;
