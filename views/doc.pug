@@ -1,0 +1,65 @@
+doctype html
+html
+    head
+        title Документация
+    body
+        h1 инф
+        p.
+            Lorem ipsum dolor sit amet,
+            consectetur adipiscing elit.
+            Morbi interdum nunc dui,
+            non commodo libero condimentum id.
+            Nullam hendrerit vitae enim vel porta.
+            Morbi at lacus neque.
+            Cras bibendum sit amet diam id sollicitudin.
+            Mauris ligula eros, consectetur ut elit in,
+            commodo volutpat orci.
+            Suspendisse dignissim arcu dui,
+            et sollicitudin neque ultrices nec.
+            Vivamus enim elit, semper et nisl sit amet,
+            pretium posuere sapien.
+            Sed venenatis nibh quis justo laoreet fermentum.
+
+        h1 Platforms
+        h2 GET /#api#/platforms
+        p Возвращает массив существующих платформ
+        h3 Возможные параметры запроса:
+        dl
+            dt Параметры фильтрации
+            dl.
+                Фильтрует результат по соответствующему полю (по подстроке).
+                Список доступных параметров: name, company, controller, store.
+            dt sort
+            dl.
+                Указывает по какому полю производить сортировку.
+                Возможные значения: name, company, controller, store.
+                При указании непредусмотренног значения генерируется 400 ошибка.
+            dt order
+            dl.
+                Указывает направление сортировки. Имеет смысл только в паре с sort.
+                Возможные значения: asc, desc.
+                По умолчанию равен asc.
+            dt limit
+            dl.
+                Указывает ограничение выборки.
+                Значение должно лежать в интервале в интервале (0;100].
+                По умолчанию равено 10.
+            dt skip
+            dl.
+                Указывает смещение откуда нужно начинать выборку
+                Значение должно быть больше или равно 0
+                По умолчанию равно 0.
+            dt Остальные параметры игнорируются
+        h3 Результат
+        p Возвращается массив объектов вида:
+        pre.
+            {
+                "_id": "5904844017e06c120455ac03",
+                "name": "name",
+                "company": null,
+                "controller": null,
+                "store": "store"
+            }
+
+                
+                
