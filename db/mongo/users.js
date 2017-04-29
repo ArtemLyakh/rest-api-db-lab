@@ -373,4 +373,132 @@ router.delete('/:id/libraries/:idp', (req, res) => {
 
 
 
+
+router.get('/:id/libraries/:idp/games', (req, res) => {
+    let db = req.app.locals.mongo;
+
+    if (!ObjectId.isValid(req.params.id) || !ObjectId.isValid(req.params.idp)){
+        res.status(400).send({error: "Id is invalid"});
+        return;
+    }
+
+    let id = new ObjectId.ObjectID(req.params.id);
+    let idp = new ObjectId.ObjectID(req.params.idp);
+
+    db.collection('users').findOne({_id: id})
+        .then(result => {
+            if (!result) {
+                throw {code: 404, data: {error: "User not found"}};
+            } else {
+                return result;
+            }
+        })
+        .then(user => {
+            let games = null;
+            user.libraries.forEach(el => {
+                if (el.platform && el.platform._id == req.params.idp) {
+                    games = el.games;
+                }
+            });
+            if (games === null) {
+                throw new {code: 404, data: {error: "Library not found"}};
+            } else {
+                return games;
+            }
+        })
+        .then(games => {
+            res.send(games);
+        })
+        .catch(error => {
+            if (error.code) {
+                res.status(error.code).send(error.data);
+            } else {
+                throw error;
+            }
+        })
+        .catch(error => {
+            res.status(500).send({error});
+        });
+});
+
+router.get('/:id/libraries/:idp/games/:idg', (req, res) => {
+    let db = req.app.locals.mongo;
+
+    if (!ObjectId.isValid(req.params.id)
+        || !ObjectId.isValid(req.params.idp)
+        || !ObjectId.isValid(req.params.idg)
+        ) {
+        res.status(400).send({error: "Id is invalid"});
+        return;
+    }
+
+    let id = new ObjectId.ObjectID(req.params.id);
+    let idp = new ObjectId.ObjectID(req.params.idp);
+    let idg = new ObjectId.ObjectID(req.params.idg);
+
+    db.collection('users').findOne({_id: id})
+        .then(result => {
+            if (!result) {
+                throw {code: 404, data: {error: "User not found"}};
+            } else {
+                return result;
+            }
+        })
+        .then(user => {
+            let games = null;
+            user.libraries.forEach(el => {
+                if (el.platform && el.platform._id == req.params.idp) {
+                    games = el.games;
+                }
+            });
+            if (games === null) {
+                throw new {code: 404, data: {error: "Library not found"}};
+            } else {
+                return games;
+            }
+        })
+        .then(games => {
+            let game = null;
+            games.forEach(el => {
+                if (el._id === req.params.idp) {
+                    game = el;
+                }
+            });
+            if (game === null) {
+                throw {code: 404, data: {error: "Game not found"}};
+            } else {
+                return game;
+            }
+        })
+        .then(game => {
+            res.send(game);
+        })
+        .catch(error => {
+            if (error.code) {
+                res.status(error.code).send(error.data);
+            } else {
+                throw error;
+            }
+        })
+        .catch(error => {
+            res.status(500).send({error});
+        });
+});
+
+router.put('/:id/libraries/:idp', (req, res) => {
+    if (!ObjectId.isValid(req.params.id)
+        || !ObjectId.isValid(req.params.idp)
+        ) {
+        res.status(400).send({error: "Id is invalid"});
+        return;
+    }
+
+    let id = new ObjectId.ObjectID(req.params.id);
+    let idp = new ObjectId.ObjectID(req.params.idp);
+
+    
+
+});
+
+
 module.exports = router;
