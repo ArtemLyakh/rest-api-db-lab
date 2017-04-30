@@ -1,424 +1,737 @@
 const router = require('express').Router();
-const model = require('./games_model');
 const ObjectId = require('mongodb').ObjectId;
 
 router.get('/', (req, res) => {
     let db = req.app.locals.mongo;
-    let limit = 10, skip = 0;
-    let sort = {};
-    let errors = [];
 
-    if (req.query.sort) {
-        if (typeof(model[req.query.sort]) == "undefined") {
-            errors.push('Parameter #sort# is invalid');
-        } else {
-            sortKey = req.query.sort;
-            if (req.query.direction === "desc") {
-                sort[sortKey] = -1;
-            } else if (!req.query.direction || req.query.direction === "asc") {
-                sort[sortKey] = 1;
+    let filter = {};
+    let sort = {};
+    let limit = 10, skip = 0;
+
+    Promise.resolve()
+    //фильтрация
+    .then(() => {
+        if (req.query.name) {
+            filter.name = new RegExp(req.query.name, 'i');
+        }
+    })
+    .then(() => {
+        if (req.query.genre) {
+            filter.genre = new RegExp(req.query.genre, 'i');
+        }
+    })
+    .then(() => {
+        if (req.query.rating) {
+            if (req.query.rating.indexOf(";") != -1) {
+                let ratingArr = req.query.rating.split(";");
+                if (ratingArr.length != 2) {
+                    throw {code: 400, data: {error: "Parameter rating is invalid"}};
+                }
+                let low = parseInt(ratingArr[0]);
+                let top = parseInt(ratingArr[1]);
+                if (ratingArr[0] && ratingArr[1]) {
+                    if (isNaN(low) || isNaN(top)) {
+                        throw {code: 400, data: {error: "Parameter rating is invalid"}};
+                    }
+                    filter.rating = {$gte: low, $lte: top};
+                } else if (ratingArr[0]) {
+                    if (isNaN(low)) {
+                        throw {code: 400, data: {error: "Parameter rating is invalid"}};
+                    }
+                    filter.rating = {$gte: low};
+                } else if (ratingArr[1]) {
+                    if (isNaN(top)) {
+                        throw {code: 400, data: {error: "Parameter rating is invalid"}};
+                    }
+                    filter.rating = {$lte: top};                  
+                } else {
+                    throw {code: 400, data: {error: "Parameter rating is invalid"}};
+                }
             } else {
-                errors.push('Parameter #direction# is invalid');
+                let rating = parseInt(req.query.rating);
+                if (isNaN(rating)) {
+                    throw {code: 400, data: {error: "Parameter rating is invalid"}};
+                }
+                filter.rating = rating;
             }
         }
-    }
+    })
 
-    if (req.query.limit) {
-        limit = parseInt(req.query.limit);
-        if (isNaN(limit) || limit > 100 || limit < 0)
-            errors.push('Parameter #limit# is invalid');
-    } 
-    if (req.query.skip) {
-        skip = parseInt(req.query.skip);
-        if (isNaN(skip) || skip < 0)
-            errors.push('Parameter #skip# is invalid');
-    }
-    if (errors.length > 0){
-        res.status(400).send({errors});
-        return;
-    }
-        
-    let filter = {};
-    for (let key in model) {
-        if (model[key].type == "array") continue;
-        let filterable = model[key].filterable;
-        if (!filterable) continue;
-
-        if (req.query[key]){
-            filter[key] = new RegExp('.*' + req.query[key] + '.*', 'i');
+    //сортировка
+    .then(() => {
+        if (req.query.sort) {
+            if (["name", "genre", "rating"].indexOf(req.query.sort) === -1) {
+                throw {code: 400, data: {error: "Parameter sort is invalid"}};
+            } else {
+                if (!req.query.order || req.query.order === "asc") {
+                    sort[req.query.sort] = 1;
+                } else if (req.query.order === "desc") {
+                    sort[req.query.sort] = -1;
+                } else {
+                    throw {code: 400, data: {error: "Parameter order is invalid"}};
+                }
+            }
         }
-    }
+    })
 
-    db.collection('games').find(filter).sort(sort).skip(skip).limit(limit).toArray()
-        .then(data => {
-            res.send(data);
-        })
-        .catch(error => {
-            res.status(500).send({error});
-        });
+    //пагинация
+    .then(() => {
+        if (req.query.limit) {
+            limit = parseInt(req.query.limit);
+            if (isNaN(limit) || limit > 100 || limit <= 0) {
+                throw {code: 400, data: {error: "Parameter limit is invalid"}};
+            }
+        }
+    })
+    .then(() => {
+        if (req.query.skip) {
+            skip = parseInt(req.query.skip);
+            if (isNaN(skip) || skip < 0) {
+                throw {code: 400, data: {error: "Parameter skip is invalid"}};
+            }
+        }
+    })
+
+    //запрос
+    .then(() => {
+        return db.collection('games').find(filter).sort(sort).skip(skip).limit(limit).toArray();
+    })
+    .then(result => {
+        res.send(result);
+    })
+
+    .catch(error => {
+        if (!error.code) {
+            throw error;
+        } else {
+            res.status(error.code).send(error.data);
+        }
+    })
+    .catch(error => {
+        res.status(500).send(error);
+    });
+
 });
 
 router.get('/:id', (req, res) => {
     let db = req.app.locals.mongo;
+    let id;
 
-    if (!ObjectId.isValid(req.params.id)){
-        res.status(400).send({error: "Id is invalid"});
-        return;
-    }
+    Promise.resolve()
+    //валидация id
+    .then(() => {
+        if (!ObjectId.isValid(req.params.id)) {
+            throw {code: 400, data: {error: `Game id: ${req.params.id} is invalid`}};
+        } else {
+            id = ObjectId.ObjectID(req.params.id);
+        }
+    })
 
-    let id = new ObjectId.ObjectID(req.params.id);
+    //запрос
+    .then(() => {
+        return db.collection('games').findOne({_id: id});
+    })
+    .then(result => {
+        if (!result) {
+            throw {code: 404, data: {error: "Game not found"}};
+        } else {
+            res.send(result);
+        }
+    })
 
-    db.collection('games').findOne({_id: id})
-        .then(result => {
-            if (!result) {
-                res.status(404).send({success: false});
-            } else {
-                res.send(result);
-            }
-        })
-        .catch(error => {
-            res.status(500).send({error});
-        });
+    //ошибки
+    .catch(error => {
+        if (!error.code) {
+            throw error;
+        } else {
+            res.status(error.code).send(error.data);
+        }
+    })
+    .catch(error => {
+        res.status(500).send(error);
+    });
+
 });
 
 router.put('/', (req, res) => {
     let db = req.app.locals.mongo;
     let obj = {};
-    let errors = [];
 
-    for (let key in model) {
-        let type = model[key].type;
-
-        if (type == "array") {
-            obj[key] = [];
-            continue;
+    Promise.resolve()
+    //валидация параметров
+    .then(() => {
+        if (!req.body.name) {
+            throw {code: 400, data: {error: "Parameter name is required"}};
+        }
+        if (typeof(req.body.name) !== "string") {
+            throw {code: 400, data: {error: "Parameter name has to be a string"}};
         }
 
-        
-        let required = model[key].required;
-
-        if (required && !req.body[key]){
-            errors.push(`Field ${key} is required`);
-        }
-        if (req.body[key] && typeof(req.body[key]) != type){
-            errors.push(`Field ${key} have to be a ${type}`);
-        }
-
-        if (req.body[key]) obj[key] = req.body[key];
-    }
-
-    if (errors.length > 0) {
-        res.status(400).send({errors});
-        return;
-    }
-
-    db.collection('games').insert(obj)
-        .then(result => {
-            res.send(result.ops);
-        })
-        .catch(error => {
-            if (error.code == 11000) {
-                res.status(400).send({error: "Duplicates are forbidden"});
-            } else {
-                res.status(500).send({error});
+        obj.name = req.body.name;
+    })
+    .then(() => {
+        if (req.body.genre) {
+            if (typeof(req.body.genre) !== "string") {
+                throw {code: 400, data: {error: "Parameter genre has to be a string"}};
             }
-        });
+
+            obj.genre = req.body.genre;
+        } else {
+            obj.genre = null;
+        }
+    })
+    .then(() => {
+        if (req.body.rating) {
+            if (typeof(req.body.rating) !== "number") {
+                throw {code: 400, data: {error: "Parameter rating has to be a number"}};
+            }
+
+            obj.rating = req.body.rating;
+        } else {
+            obj.rating = null;
+        }
+    })
+    .then(() => {
+        obj.releases = [];
+    })
+
+    //запрос
+    .then(() => {
+        return db.collection('games').insert(obj);
+    })
+    .then(result => {
+        res.send(result.ops);
+    })
+
+    //ошибки
+    .catch(error => {
+        if (error.code == 11000) {
+            res.status(403).send({error: `Game with name: ${req.body.name} already exists`});
+        } else {
+            throw error;
+        }
+    })
+    .catch(error => {
+        if (!error.code) {
+            throw error;
+        } else {
+            res.status(error.code).send(error.data);
+        }
+    })
+    .catch(error => {
+        res.status(500).send(error);
+    });
+
 });
 
 router.delete('/:id', (req, res) => {
     let db = req.app.locals.mongo;
+    let id;
 
-    if (!ObjectId.isValid(req.params.id)){
-        res.status(400).send({error: "Id is invalid"});
-        return;
-    }
+    Promise.resolve()
+    //валидация id
+    .then(() => {
+        if (!ObjectId.isValid(req.params.id)) {
+            throw {code: 400, data: {error: `Game id: ${req.params.id} is invalid`}};
+        } else {
+            id = ObjectId.ObjectID(req.params.id);
+        }
+    })
 
-    let id = new ObjectId.ObjectID(req.params.id);
+    //запрос
+    .then(() => {
+        return db.collection('games').deleteOne({_id: id});
+    })
+    .then(result => {
+        if (result.deletedCount === 0) {
+            throw {code: 404, data: {error: "Game not found"}};
+        } else {
+            res.send({success: true});
+        }
+    })
 
-    db.collection('games').deleteOne({_id: id})
-        .then(result => {
-            if (result.deletedCount === 0) {
-                res.status(404).send({success: false});
-            } else {
-                res.send({success: true});
-            }
-        })
-        .catch(error => {
-            res.status(500).send({error});
-        });
+    //ошибки
+    .catch(error => {
+        if (!error.code) {
+            throw error;
+        } else {
+            res.status(error.code).send(error.data);
+        }
+    })
+    .catch(error => {
+        res.status(500).send(error);
+    });
 
 });
 
 router.patch('/:id', (req, res) => {
     let db = req.app.locals.mongo;
+    let id;
     let obj = {};
-    let errors = [];
 
-    if (!ObjectId.isValid(req.params.id)){
-        res.status(400).send({error: "Id is invalid"});
-        return;
-    }
-    let id = new ObjectId.ObjectID(req.params.id);
-
-    for (var key in model) {
-        let type = model[key].type;
-        if (type == "array") continue;
-
-        if (req.body[key] && typeof(req.body[key]) != type){
-            errors.push(`Field ${key} have to be a ${type}`);
+    Promise.resolve()
+    //валидация id
+    .then(() => {
+        if (!ObjectId.isValid(req.params.id)) {
+            throw {code: 400, data: {error: `Game id: ${req.params.id} is invalid`}};
+        } else {
+            id = ObjectId.ObjectID(req.params.id);
         }
+    })
 
-        if (req.body[key]) obj[key] = req.body[key];
-    }
+    //Проверка наличия параметров
+    .then(() => {
+        if (Object.keys(req.body).length === 0) {
+            throw {code: 400, data: {error: "Parameters for update are empty"}};
+        }
+    })
 
-    if (errors.length > 0) {
-        res.status(400).send({errors});
-        return;
-    }
-    
-    db.collection('games').updateOne({_id: id}, {$set: obj})
-        .then(result => {
-            if (result.matchedCount == 0) {
-                res.status(404).send({success: false});
-            } else {
-                res.send({success: true});
-            }          
-        })
-        .catch(error => {
-            if (error.code == 11000) {
-                res.status(400).send({error: "Duplicates are forbidden"});
-            } else {
-                res.status(500).send({error});
+    //валидация параметров
+    .then(() => {
+        if (req.body.name) {
+            if (typeof(req.body.name) !== "string") {
+                throw {code: 400, data: {error: "Parameter name has to be a string"}};
             }
-        });
+
+            obj.name = req.body.name;
+        }
+    })
+    .then(() => {
+        if (req.body.genre) {
+            if (typeof(req.body.genre) !== "string") {
+                throw {code: 400, data: {error: "Parameter genre has to be a string"}};
+            }
+
+            obj.genre = req.body.genre;
+        }
+    })
+    .then(() => {
+        if (req.body.rating) {
+            if (typeof(req.body.rating) !== "number") {
+                throw {code: 400, data: {error: "Parameter rating has to be a number"}};
+            }
+
+            obj.rating = req.body.rating;
+        }
+    })
+
+    //Проверка наличия параметров для обновления
+    .then(() => {
+        if (Object.keys(obj).length === 0) {
+            throw {code: 400, data: {error: "Allowed parameters are not set"}};
+        }
+    })
+
+    //запрос
+    .then(() => {
+        return db.collection('games').updateOne({_id: id}, {$set: obj});
+    })
+    .then(result => {
+        if (result.matchedCount == 0) {
+            throw {code: 404, data: {error: "Game not found"}}
+        } else {
+            return db.collection('games').findOne({_id: id});
+        }  
+    })
+    .then(result => {
+        res.send(result);
+    })
+
+     //ошибки
+    .catch(error => {
+        if (error.code == 11000) {
+            res.status(403).send({error: `Game with name: ${req.body.name} already exists`});
+        } else {
+            throw error;
+        }
+    })
+    .catch(error => {
+        if (!error.code) {
+            throw error;
+        } else {
+            res.status(error.code).send(error.data);
+        }
+    })
+    .catch(error => {
+        res.status(500).send(error);
+    });   
 
 });
 
 
 
 
-router.get('/:id/platforms', (req, res) => {
+
+
+
+
+
+
+
+
+
+router.get('/:id/releases', (req, res) => {
     let db = req.app.locals.mongo;
 
-    if (!ObjectId.isValid(req.params.id)){
-        res.status(400).send({error: "Id is invalid"});
-        return;
-    }
+    let id;
 
-    let id = new ObjectId.ObjectID(req.params.id);
+    let filter = {};
+    let sort = {};
+    let limit = 10, skip = 0;
 
-    db.collection('games').findOne({_id: id})
-        .then(result => {
-            if (!result) {
-                res.status(404).send({success: false});
-            } else {
-                res.send(result.platforms);
-            }
-        })
-        .catch(error => {
-            res.status(500).send({error});
-        });
+    Promise.resolve()
+    //валидация id
+    .then(() => {
+        if (!ObjectId.isValid(req.params.id)) {
+            throw {code: 400, data: {error: `Game id: ${req.params.id} is invalid`}};
+        } else {
+            id = ObjectId.ObjectID(req.params.id);
+        }
+    })
+
+    //запрос
+    .then(() => {
+        return db.collection('games').findOne({_id: id});
+    })
+    .then(result => {
+        if (!result) {
+            throw {code: 404, data: {error: "Game not found"}};
+        } else {
+            return result.releases;
+        }
+    })
+    .then(result => {
+        res.send(result);
+    })
+
+    //ошибки
+    .catch(error => {
+        if (!error.code) {
+            throw error;
+        } else {
+            res.status(error.code).send(error.data);
+        }
+    })
+    .catch(error => {
+        res.status(500).send(error);
+    });
+ 
 });
 
-router.get('/:id/platforms/:idp', (req, res) => {
+router.get('/:id/releases/:idp', (req, res) => {
     let db = req.app.locals.mongo;
+    let id, idp;
 
-    if (!ObjectId.isValid(req.params.id) || !ObjectId.isValid(req.params.idp)) {
-        res.status(400).send({error: "Id is invalid"});
-        return;
-    }
+    Promise.resolve()
+    //валидация id
+    .then(() => {
+        if (!ObjectId.isValid(req.params.id)) {
+            throw {code: 400, data: {error: `Game id: ${req.params.id} is invalid`}};
+        } else {
+            id = ObjectId.ObjectID(req.params.id);
+        }
+    })
+    .then(() => {
+        if (!ObjectId.isValid(req.params.idp)) {
+            throw {code: 400, data: {error: `Platform id: ${req.params.idp} is invalid`}};
+        } else {
+            idp = ObjectId.ObjectID(req.params.idp);
+        }
+    })
 
-    let id = new ObjectId.ObjectID(req.params.id);
-    let idp = new ObjectId.ObjectID(req.params.idp);
+    //запрос
+    .then(() => {
+        return db.collection('games').findOne({_id: id});
+    })
+    .then(result => {
+        if (!result) {
+            throw {code: 404, data: {error: "Game not found"}};
+        } else {
+            return result.releases;
+        }
+    })
 
-    db.collection('games').findOne({_id: id})
-        .then(result => {
-            if (!result) {
-                res.status(404).send({error: "Game not found"});
-            } else {
-                let platform = null;
-                result.platforms.forEach((el, i, arr) => {
-                    if (el.platform && el.platform._id == req.params.idp) {
-                        platform = el;
-                    }
-                });
-                if (platform == null) {
-                    res.status(404).send({success: false});
-                } else {
-                   res.send(platform);
-                }               
-            }
-        })
-        .catch(error => {
-            res.status(500).send({error});
-        });
-});
+    //поиск релиза
+    .then(releases => {
+        return releases.find(i => i.platform._id.equals(idp));
+    })
+    .then(release => {
+        if (!release) {
+            throw {code: 404, data: {error: "Platform not found"}};
+        } else {
+            res.send(release);
+        }
+    })
 
-router.put('/:id/platforms', (req, res) => {
-    let db = req.app.locals.mongo;
-
-    if (!ObjectId.isValid(req.params.id)) {
-        res.status(400).send({error: "Id is invalid"});
-        return;
-    }
-
-    let id = new ObjectId.ObjectID(req.params.id);
-
-    let errors = [];
-    if (!req.body.platform) {
-        errors.push("Parametr #platform# is required");
-    }
-    if (ObjectId.isValid(req.body.platform && !req.body.platform)) {
-        errors.push(`Platform id: ${req.body.platform} is invalid`);
-    }
-    if (req.body.price && (typeof(req.body.price) != "number" || req.body.price < 0)) {
-        errors.push("Parametr #price# is invalid");
-    }
-    if (req.body.release && (typeof(req.body.release) != "number" || req.body.release < 0)) {
-        errors.push("Parametr #release# is invalid");
-    }
-
-    if (errors.length > 0) {
-        res.status(400).send({errors});
-        return;
-    }
-    
-    let platformId = new ObjectId.ObjectID(req.body.platform);
-
-    db.collection('platforms').findOne({_id: platformId})
-        .then(result => {
-            if (!result) {
-                res.status(404).send({error: "Platforms not found"});
-            } else {
-                let obj = {
-                    platform: {
-                        _id: result._id,
-                        name: result.name
-                    }
-                }
-                if (req.body.price) obj.price = req.body.price;
-                if (req.body.release) obj.release = req.body.release;
-
-                db.collection('games').updateOne({_id: id}, {$addToSet: {platforms: obj}})
-                    .then(result => {
-                        if (result.matchedCount == 0) {
-                            res.status(404).send({error: "Game not found"});
-                        } else {
-                            res.send({success: true});
-                        }
-                    })
-                    .catch(error => {
-                        res.status(500).send({error});
-                    });
-            }
-        })
-        .catch(error => {
-            res.status(500).send({error});
-        });
-
+    //ошибки
+    .catch(error => {
+        if (!error.code) {
+            throw error;
+        } else {
+            res.status(error.code).send(error.data);
+        }
+    })
+    .catch(error => {
+        res.status(500).send(error);
+    });
 
 });
 
-router.delete('/:id/platforms/:idp', (req, res) => {
+router.put('/:id/releases', (req, res) => {
     let db = req.app.locals.mongo;
+    let id, idp;
+    let obj;
 
-    if (!ObjectId.isValid(req.params.id) || !ObjectId.isValid(req.params.idp)) {
-        res.status(400).send({error: "Id is invalid"});
-        return;
-    }
+    Promise.resolve()
+    //валидация id
+    .then(() => {
+        if (!ObjectId.isValid(req.params.id)) {
+            throw {code: 400, data: {error: `Game id: ${req.params.id} is invalid`}};
+        } else {
+            id = ObjectId.ObjectID(req.params.id);
+        }
+    })
 
-    let id = new ObjectId.ObjectID(req.params.id);
-    let idp = new ObjectId.ObjectID(req.params.idp);
-
-    db.collection('games').findOne({_id: id})
-        .then(result => {
-            if (!result) {
-                res.status(404).send({error: "Game not found"});
-            } else {
-                let platforms = [];
-                result.platforms.forEach(el => {
-                    if (!el.platform || !el.platform._id.equals(idp)) {
-                        platforms.push(el);
-                    }
-                });
-                if (result.platforms.length === platforms.length) {
-                    res.status(404).send({error: "Platform not found"});
-                } else {
-                    db.collection('games').updateOne({_id: id}, {platforms})
-                        .then(result => {
-                            res.send({success: true});
-                        })
-                        .catch(error => {
-                            res.status(500).send({error});
-                        });
-                }
+    //валидация параметров
+    .then(() => {
+        if (!req.body.platform) {
+            throw {code: 400, data: {error:"Parameter platform is required"}};
+        }
+        if (!ObjectId.isValid(req.body.platform)) {
+            throw {code: 400, data: {error: `Platform id: ${req.body.platform} is invalid`}};
+        }
+        idp = ObjectId.ObjectID(req.body.platform);
+    })
+    .then(() => {
+        if (req.body.price) {
+            if (typeof(req.body.price) != "number") {
+                throw {code: 400, data: {error: "Parameter price has to be a number"}};
             }
-            
-        })
-        .catch(error => {
-            res.status(500).send({error});
-        });
+        }
+    })
+    .then(() => {
+        if (req.body.date) {
+            if (typeof(req.body.date) != "number") {
+                throw {code: 400, data: {error: "Parameter date has to be a number (Unix timestamp)"}};
+            }
+        }
+    })
+
+    //запрос плафтормы
+    .then(() => {
+        return db.collection('platforms').findOne({_id: idp});
+    })
+    .then(result => {
+        if (!result) {
+            throw {code: 404, data: {error: "Platform not found"}};
+        } else {
+            return result;
+        }
+    })
+
+    //создание объекта
+    .then(platform => {
+        obj = {
+            platform: {
+                _id: platform._id,
+                name: platform.name
+            }
+        };
+        if (req.body.price) obj.price = req.body.price;
+        if (req.body.date) obj.date = req.body.date;
+    })
+
+    //проверка существования релиза для данной платформы
+    .then(() => {
+        return db.collection('games').findOne({_id: id});
+    })
+    .then(result => {
+        if (!result) {
+            throw {code: 404, data: {error: "Game not found"}};
+        } else {
+            return result.releases.find(i => i.platform._id.equals(idp));
+        }
+    })
+    .then(platform => {
+        if (platform) {
+            throw {code: 403, data: {error: `Release with platform ${idp.toString()} is already exists`}};
+        }
+    })
+
+    //добавление объекта
+    .then(() => {
+        return db.collection('games').updateOne({_id: id}, {$addToSet: {releases: obj}});
+    })
+    .then(result => {
+        if (result.matchedCount == 0) {
+            throw {code: 404, data: {error: "Game not found"}};
+        } else {
+            return db.collection('games').findOne({_id: id});
+        }
+    })
+    .then(result => {
+        res.send(result);
+    })
+
+    //ошибки
+    .catch(error => {
+        if (!error.code) {
+            throw error;
+        } else {
+            res.status(error.code).send(error.data);
+        }
+    })
+    .catch(error => {
+        res.status(500).send(error);
+    });          
+
 });
 
-router.patch('/:id/platforms/:idp', (req, res) => {
+router.delete('/:id/releases/:idp', (req, res) => {
     let db = req.app.locals.mongo;
+    let id, idp;
 
-    if (!ObjectId.isValid(req.params.id) || !ObjectId.isValid(req.params.idp)) {
-        res.status(400).send({error: "Id is invalid"});
-        return;
-    }
+    Promise.resolve()
+    //валидация id
+    .then(() => {
+        if (!ObjectId.isValid(req.params.id)) {
+            throw {code: 400, data: {error: `Game id: ${req.params.id} is invalid`}};
+        } else {
+            id = ObjectId.ObjectID(req.params.id);
+        }
+    })
+    .then(() => {
+        if (!ObjectId.isValid(req.params.idp)) {
+            throw {code: 400, data: {error: `Platform id: ${req.params.idp} is invalid`}};
+        } else {
+            idp = ObjectId.ObjectID(req.params.idp);
+        }
+    })
 
-    let id = new ObjectId.ObjectID(req.params.id);
-    let idp = new ObjectId.ObjectID(req.params.idp);
+    //запрос
+    .then(() => {
+        return db.collection('games').updateOne({_id: id}, {$pull: {releases: {"platform._id": idp}}});
+    })
+    .then(result => {
+        if (result.matchedCount === 0) {
+            throw {code: 404, data: {error: "Game not found"}};
+        }
+        if (result.modifiedCount === 0) {
+            throw {code: 404, data: {error: "Platform not found"}};
+        }
+        res.send({success: true});
+    })
 
-    let errors = [];
-    if (req.body.price && (typeof(req.body.price) != "number" || req.body.price < 0)) {
-        errors.push("Parametr #price# is invalid");
-    }
-    if (req.body.release && (typeof(req.body.release) != "number" || req.body.release < 0)) {
-        errors.push("Parametr #release# is invalid");
-    }
+    //ошибки
+    .catch(error => {
+        if (!error.code) {
+            throw error;
+        } else {
+            res.status(error.code).send(error.data);
+        }
+    })
+    .catch(error => {
+        res.status(500).send(error);
+    });  
 
-    if (errors.length > 0) {
-        res.status(400).send({errors});
-        return;
-    }
-    
-    db.collection('games').findOne({_id: id})
-        .then(result => {
-            if (!result) {
-                res.status(404).send({error: "Game not found"});
-            } else {
-                let platforms = [];
-                let found = false;
-                result.platforms.forEach(el => {
-                    if (el.platform && el.platform._id.equals(idp)) {
-                        if (req.body.price) el.price = req.body.price;
-                        if (req.body.release) el.release = req.body.release;
-                        platforms.push(el);
-                        found = true;
-                    } else {
-                        platforms.push(el);
-                    }
-                });
-                if (!found) {
-                    res.status(404).send({error: "Platform not found"});
-                } else {
-                    db.collection('games').updateOne({_id: id}, {platforms})
-                        .then(result => {
-                            res.send({success: true});
-                        })
-                        .catch(error => {
-                            res.status(500).send({error});
-                        });
-                }
+   
+});
+
+router.patch('/:id/releases/:idp', (req, res) => {
+    let db = req.app.locals.mongo;
+    let id, idp;
+    let obj = {};
+
+    Promise.resolve()
+    //валидация id
+    .then(() => {
+        if (!ObjectId.isValid(req.params.id)) {
+            throw {code: 400, data: {error: `Game id: ${req.params.id} is invalid`}};
+        } else {
+            id = ObjectId.ObjectID(req.params.id);
+        }
+    })
+    .then(() => {
+        if (!ObjectId.isValid(req.params.idp)) {
+            throw {code: 400, data: {error: `Platform id: ${req.params.idp} is invalid`}};
+        } else {
+            idp = ObjectId.ObjectID(req.params.idp);
+        }
+    })
+
+    //Проверка наличия параметров
+    .then(() => {
+        if (Object.keys(req.body).length === 0) {
+            throw {code: 400, data: {error: "Parameters for update are empty"}};
+        }
+    })
+
+    //валидация параметров
+    .then(() => {
+        if (req.body.price) {
+            if (typeof(req.body.price) != "number") {
+                throw {code: 400, data: {error: "Parameter price has to be a number"}};
             }
-            
-        })
-        .catch(error => {
-            res.status(500).send({error});
-        });
 
+            obj.price = req.body.price;
+        }
+    })
+    .then(() => {
+        if (req.body.date) {
+            if (typeof(req.body.date) != "number") {
+                throw {code: 400, data: {error: "Parameter date has to be a number (Unix timestamp)"}};
+            }
+
+            obj.date = req.body.date;
+        }
+    })
+
+    //Проверка наличия параметров для обновления
+    .then(() => {
+        if (Object.keys(obj).length === 0) {
+            throw {code: 400, data: {error: "Allowed parameters are not set"}};
+        }
+    })
+
+    //формирование объекта для обновления
+    .then(() => {
+        let upd = {};
+        for (let i in obj) {
+            upd[`releases.$.${i}`] = obj[i];
+        }
+        return {$set: upd};
+    })
+
+    //запрос
+    .then(upd => {
+        return db.collection('games').updateOne({_id: id, "releases.platform._id": idp}, upd);
+    })
+    .then(result => {
+        if (result.matchedCount === 0) {
+            throw {code: 404, data: {error: "Game or platform not found"}};
+        }
+        return db.collection('games').findOne({_id: id});
+    })
+    .then(result => {
+        return result.releases.find(i => i.platform._id.equals(idp));
+    })
+    .then(release => {
+        res.send(release);
+    })
+
+    //ошибки
+    .catch(error => {
+        if (!error.code) {
+            throw error;
+        } else {
+            res.status(error.code).send(error.data);
+        }
+    })
+    .catch(error => {
+        res.status(500).send(error);
+    });     
+
+ 
 
 });
 

@@ -57,14 +57,14 @@ module.exports.resetDB = (req, res) => {
             name: "Grand Theft Auto V",
             genre: "Action",
             rating: 97,
-            platforms: [
+            releases: [
                 {
                     platform: {
                         _id: pc,
                         name: "PC"
                     },
                     price: 2000,
-                    release: 1493319189
+                    date: 1493319189
                 },
                 {
                     platform: {
@@ -72,7 +72,7 @@ module.exports.resetDB = (req, res) => {
                         name: "PlayStation 4"
                     },
                     price: 2500,
-                    release: 1493319189
+                    date: 1493319189
                 }
             ]
         });
@@ -87,13 +87,14 @@ module.exports.resetDB = (req, res) => {
             name: "BioShock Infinite",
             genre: "Shooter",
             rating: 95,
-            platforms: [
+            releases: [
                 {
                     platform: {
                         _id: pc,
                         name: "PC"
                     },
-                    price: 1500
+                    price: 1500,
+                    date: null
                 },
                 {
                     platform: {
@@ -101,7 +102,7 @@ module.exports.resetDB = (req, res) => {
                         name: "PlayStation 4"
                     },
                     price: 2000,
-                    release: 1493319189
+                    date: 1493319189
                 }
             ]
         });
@@ -116,14 +117,14 @@ module.exports.resetDB = (req, res) => {
             name: "The Last of Us",
             genre: "Action",
             rating: 97,
-            platforms: [
+            releases: [
                 {
                     platform: {
                         _id: ps4,
                         name: "PlayStation 4"
                     },
                     price: 2500,
-                    release: 1493319189
+                    date: 1493319189
                 }
             ]
         });

@@ -35,14 +35,14 @@ router.get('/', (req, res) => {
     .then(() => {
         if (req.query.sort) {
             if (["name", "company", "controller", "store"].indexOf(req.query.sort) === -1) {
-                throw {code: 400, data: {error: "Parameter #sort# is invalid"}};
+                throw {code: 400, data: {error: "Parameter sort is invalid"}};
             } else {
                 if (!req.query.order || req.query.order === "asc") {
                     sort[req.query.sort] = 1;
                 } else if (req.query.order === "desc") {
                     sort[req.query.sort] = -1;
                 } else {
-                    throw {code: 400, data: {error: "Parameter #order# is invalid"}};
+                    throw {code: 400, data: {error: "Parameter order is invalid"}};
                 }
             }
         }
@@ -53,7 +53,7 @@ router.get('/', (req, res) => {
         if (req.query.limit) {
             limit = parseInt(req.query.limit);
             if (isNaN(limit) || limit > 100 || limit <= 0) {
-                throw {code: 400, data: {error: "Parameter #limit# is invalid"}};
+                throw {code: 400, data: {error: "Parameter limit is invalid"}};
             }
         }
     })
@@ -61,7 +61,7 @@ router.get('/', (req, res) => {
         if (req.query.skip) {
             skip = parseInt(req.query.skip);
             if (isNaN(skip) || skip < 0) {
-                throw {code: 400, data: {error: "Parameter #skip# is invalid"}};
+                throw {code: 400, data: {error: "Parameter skip is invalid"}};
             }
         }
     })
@@ -96,7 +96,7 @@ router.get('/:id', (req, res) => {
     //валидация id
     .then(() => {
         if (!ObjectId.isValid(req.params.id)) {
-            throw {code: 400, data: {error: `Platform id: #${req.params.id}# is invalid`}};
+            throw {code: 400, data: {error: `Platform id: ${req.params.id} is invalid`}};
         } else {
             id = ObjectId.ObjectID(req.params.id);
         }
@@ -136,10 +136,10 @@ router.put('/', (req, res) => {
     //валидация параметров
     .then(() => {
         if (!req.body.name) {
-            throw {code: 400, data: {error: "Parameter #name# is required"}};
+            throw {code: 400, data: {error: "Parameter name is required"}};
         }
         if (typeof(req.body.name) !== "string") {
-            throw {code: 400, data: {error: "Parameter #name# has to be a string"}};
+            throw {code: 400, data: {error: "Parameter name has to be a string"}};
         }
 
         obj.name = req.body.name;
@@ -147,7 +147,7 @@ router.put('/', (req, res) => {
     .then(() => {
         if (req.body.company) {
             if (typeof(req.body.company) !== "string") {
-                throw {code: 400, data: {error: "Parameter #company# has to be a string"}};
+                throw {code: 400, data: {error: "Parameter company has to be a string"}};
             }
 
             obj.company = req.body.company;
@@ -158,7 +158,7 @@ router.put('/', (req, res) => {
     .then(() => {
         if (req.body.controller) {
             if (typeof(req.body.controller) !== "string") {
-                throw {code: 400, data: {error: "Parameter #controller# has to be a string"}};
+                throw {code: 400, data: {error: "Parameter controller has to be a string"}};
             }
 
             obj.controller = req.body.controller;
@@ -169,7 +169,7 @@ router.put('/', (req, res) => {
     .then(() => {
         if (req.body.store) {
             if (typeof(req.body.store) !== "string") {
-                throw {code: 400, data: {error: "Parameter #store# has to be a string"}};
+                throw {code: 400, data: {error: "Parameter store has to be a string"}};
             }
 
             obj.store = req.body.store;
@@ -185,11 +185,12 @@ router.put('/', (req, res) => {
     .then(result => {
         res.send(result.ops);
     })
+    
 
     //ошибки
     .catch(error => {
         if (error.code == 11000) {
-            res.status(400).send({error: `Platform with name: ${req.body.name} already exists`});
+            res.status(403).send({error: `Platform with name: ${req.body.name} already exists`});
         } else {
             throw error;
         }
@@ -215,7 +216,7 @@ router.delete('/:id', (req, res) => {
     //валидация id
     .then(() => {
         if (!ObjectId.isValid(req.params.id)) {
-            throw {code: 400, data: {error: `Platform id: #${req.params.id}# is invalid`}};
+            throw {code: 400, data: {error: `Platform id: ${req.params.id} is invalid`}};
         } else {
             id = ObjectId.ObjectID(req.params.id);
         }
@@ -256,9 +257,16 @@ router.patch('/:id', (req, res) => {
     //валидация id
     .then(() => {
         if (!ObjectId.isValid(req.params.id)) {
-            throw {code: 400, data: {error: `Platform id: #${req.params.id}# is invalid`}};
+            throw {code: 400, data: {error: `Platform id: ${req.params.id} is invalid`}};
         } else {
             id = ObjectId.ObjectID(req.params.id);
+        }
+    })
+
+    //Проверка наличия параметров
+    .then(() => {
+        if (Object.keys(req.body).length === 0) {
+            throw {code: 400, data: {error: "Parameters for update are empty"}};
         }
     })
 
@@ -266,7 +274,7 @@ router.patch('/:id', (req, res) => {
     .then(() => {
         if (req.body.name) {
             if (typeof(req.body.name) !== "string") {
-                throw {code: 400, data: {error: "Parameter #name# has to be a string"}};
+                throw {code: 400, data: {error: "Parameter name has to be a string"}};
             }
 
             obj.name = req.body.name;
@@ -275,7 +283,7 @@ router.patch('/:id', (req, res) => {
     .then(() => {
         if (req.body.company) {
             if (typeof(req.body.company) !== "string") {
-                throw {code: 400, data: {error: "Parameter #company# has to be a string"}};
+                throw {code: 400, data: {error: "Parameter company has to be a string"}};
             }
 
             obj.company = req.body.company;
@@ -284,7 +292,7 @@ router.patch('/:id', (req, res) => {
     .then(() => {
         if (req.body.controller) {
             if (typeof(req.body.controller) !== "string") {
-                throw {code: 400, data: {error: "Parameter #controller# has to be a string"}};
+                throw {code: 400, data: {error: "Parameter controller has to be a string"}};
             }
 
             obj.controller = req.body.controller;
@@ -293,10 +301,17 @@ router.patch('/:id', (req, res) => {
     .then(() => {
         if (req.body.store) {
             if (typeof(req.body.store) !== "string") {
-                throw {code: 400, data: {error: "Parameter #store# has to be a string"}};
+                throw {code: 400, data: {error: "Parameter store has to be a string"}};
             }
 
             obj.store = req.body.store;
+        }
+    })
+
+    //Проверка наличия параметров для обновления
+    .then(() => {
+        if (Object.keys(obj).length === 0) {
+            throw {code: 400, data: {error: "Allowed parameters are not set"}};
         }
     })
 
@@ -318,7 +333,7 @@ router.patch('/:id', (req, res) => {
     //ошибки
     .catch(error => {
         if (error.code == 11000) {
-            res.status(400).send({error: `Platform with name: ${req.body.name} already exists`});
+            res.status(403).send({error: `Platform with name: ${req.body.name} already exists`});
         } else {
             throw error;
         }
