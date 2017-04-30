@@ -8,5 +8,6 @@ module.exports = {
         username: "sql11170475",
         password: "ntizpesKuw",
         port: 3306
-    }
+    },
+    salt: "salt"
 };

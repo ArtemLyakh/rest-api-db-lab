@@ -2,6 +2,7 @@ const express = require('express');
 const MongoClient = require('mongodb').MongoClient;
 const mysql = require('mysql');
 const config = require('./config');
+const mongoRouter = require('./db/mongo/routes.js');
 
 const app = express();
 
@@ -22,6 +23,7 @@ app.locals.mysql = mysql.createPool({
 });
 
 app.set('port', (process.env.PORT || 3000));
+app.set('salt', config.mongo.connectionString);
 app.set('views', __dirname + '/views');
 app.set('view engine', 'pug');
 
@@ -30,7 +32,7 @@ app.use(express.static(__dirname + '/public'));
 
 
 app.get('/', function(req, res) {
-  res.send('Hello world');
+  res.render('doc.pug');
 });
 
 
@@ -68,6 +70,10 @@ app.get('/mysql', (req, res) => {
 
   });
 });
+
+app.use('/mongo', mongoRouter);
+
+
 
 app.listen(app.get('port'), function() {
   console.log('Node app is running on port', app.get('port'));
