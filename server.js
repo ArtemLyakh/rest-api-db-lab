@@ -23,7 +23,7 @@ app.locals.mysql = mysql.createPool({
 });
 
 app.set('port', (process.env.PORT || 3000));
-app.set('salt', "mysalt");
+app.set('salt', config.mongo.connectionString);
 app.set('views', __dirname + '/views');
 app.set('view engine', 'pug');
 
