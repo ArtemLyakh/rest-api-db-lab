@@ -1,373 +1,562 @@
 const router = require('express').Router();
-const model = require('./users_model');
 const ObjectId = require('mongodb').ObjectId;
 const md5 = require('md5');
 
+
+
 router.get('/', (req, res) => {
     let db = req.app.locals.mongo;
-    let limit = 10, skip = 0;
-    let sort = {};
-    let errors = [];
 
-    if (req.query.sort) {
-        if (typeof(model[req.query.sort]) == "undefined" || model[req.query.sort].sortable === false) {
-            errors.push('Parameter #sort# is invalid');
-        } else {
-            sortKey = req.query.sort;
-            if (req.query.direction === "desc") {
-                sort[sortKey] = -1;
-            } else if (!req.query.direction || req.query.direction === "asc") {
-                sort[sortKey] = 1;
+    let filter = {};
+    let sort = {};
+    let limit = 10, skip = 0;
+
+    Promise.resolve()
+    //фильтрация
+    .then(() => {
+        if (req.query.name) {
+            filter.name = new RegExp(req.query.name, 'i');
+        }
+    })
+
+    //сортировка
+    .then(() => {
+        if (req.query.sort) {
+            if (["name"].indexOf(req.query.sort) === -1) {
+                throw {code: 400, data: {error: "Parameter sort is invalid"}};
             } else {
-                errors.push('Parameter #direction# is invalid');
+                if (!req.query.order || req.query.order === "asc") {
+                    sort[req.query.sort] = 1;
+                } else if (req.query.order === "desc") {
+                    sort[req.query.sort] = -1;
+                } else {
+                    throw {code: 400, data: {error: "Parameter order is invalid"}};
+                }
             }
         }
-    }
+    })
 
-    if (req.query.limit) {
-        limit = parseInt(req.query.limit);
-        if (isNaN(limit) || limit > 100 || limit < 0)
-            errors.push('Parameter #limit# is invalid');
-    } 
-    if (req.query.skip) {
-        skip = parseInt(req.query.skip);
-        if (isNaN(skip) || skip < 0)
-            errors.push('Parameter #skip# is invalid');
-    }
-    if (errors.length > 0){
-        res.status(400).send({errors});
-        return;
-    }
-        
-    let filter = {};
-    for (let key in model) {
-        if (model[key].type == "array") continue;
-        let filterable = model[key].filterable;
-        if (!filterable) continue;
-
-        if (req.query[key]){
-            filter[key] = new RegExp('.*' + req.query[key] + '.*', 'i');
+    //пагинация
+    .then(() => {
+        if (req.query.limit) {
+            limit = parseInt(req.query.limit);
+            if (isNaN(limit) || limit > 100 || limit <= 0) {
+                throw {code: 400, data: {error: "Parameter limit is invalid"}};
+            }
         }
-    }
+    })
+    .then(() => {
+        if (req.query.skip) {
+            skip = parseInt(req.query.skip);
+            if (isNaN(skip) || skip < 0) {
+                throw {code: 400, data: {error: "Parameter skip is invalid"}};
+            }
+        }
+    })
 
-    db.collection('users').find(filter).sort(sort).skip(skip).limit(limit).toArray()
-        .then(data => {
-            res.send(data);
-        })
-        .catch(error => {
-            res.status(500).send({error});
-        });
+    //запрос
+    .then(() => {
+        return db.collection('users').find(filter).sort(sort).skip(skip).limit(limit).toArray();
+    })
+    .then(result => {
+        res.send(result);
+    })
+
+    .catch(error => {
+        if (!error.code) {
+            throw error;
+        } else {
+            res.status(error.code).send(error.data);
+        }
+    })
+    .catch(error => {
+        res.status(500).send(error);
+    });
+ 
 });
 
 router.get('/:id', (req, res) => {
     let db = req.app.locals.mongo;
+    let id;
 
-    if (!ObjectId.isValid(req.params.id)){
-        res.status(400).send({error: "Id is invalid"});
-        return;
-    }
+    Promise.resolve()
+    //валидация id
+    .then(() => {
+        if (!ObjectId.isValid(req.params.id)) {
+            throw {code: 400, data: {error: `User id: ${req.params.id} is invalid`}};
+        } else {
+            id = ObjectId.ObjectID(req.params.id);
+        }
+    })
 
-    let id = new ObjectId.ObjectID(req.params.id);
+    //запрос
+    .then(() => {
+        return db.collection('users').findOne({_id: id});
+    })
+    .then(result => {
+        if (!result) {
+            throw {code: 404, data: {error: "User not found"}};
+        } else {
+            res.send(result);
+        }
+    })
 
-    db.collection('users').findOne({_id: id})
-        .then(result => {
-            if (!result) {
-                res.status(404).send({error: "User not found"});
-            } else {
-                res.send(result);
-            }
-        })
-        .catch(error => {
-            res.status(500).send({error});
-        });
+    //ошибки
+    .catch(error => {
+        if (!error.code) {
+            throw error;
+        } else {
+            res.status(error.code).send(error.data);
+        }
+    })
+    .catch(error => {
+        res.status(500).send(error);
+    });
+
 });
 
 router.put('/', (req, res) => {
     let db = req.app.locals.mongo;
     let obj = {};
-    let errors = [];
 
-    for (let key in model) {
-        let type = model[key].type;
-
-        if (type == "array") {
-            obj[key] = [];
-            continue;
+    Promise.resolve()
+    //валидация параметров
+    .then(() => {
+        if (!req.body.name) {
+            throw {code: 400, data: {error: "Parameter name is required"}};
+        }
+        if (typeof(req.body.name) !== "string") {
+            throw {code: 400, data: {error: "Parameter name has to be a string"}};
         }
 
-        let required = model[key].required;
-
-        if (required && !req.body[key]){
-            errors.push(`Field ${key} is required`);
+        obj.name = req.body.name;
+    })
+    .then(() => {
+        if (!req.body.password) {
+            throw {code: 400, data: {error: "Parameter password is required"}};
         }
-        if (req.body[key] && typeof(req.body[key]) != type){
-            errors.push(`Field ${key} have to be a ${type}`);
+        if (typeof(req.body.password) !== "string") {
+            throw {code: 400, data: {error: "Parameter password has to be a string"}};
         }
 
-        if (key == 'password') {
-            obj[key] = md5(req.body[key] + req.app.get('salt'));
+        obj.password = md5(req.body.password + req.app.get('salt'));
+    })
+    .then(() => {
+        obj.libraries = [];
+    })
+
+    //запрос
+    .then(() => {
+        return db.collection('users').insert(obj);
+    })
+    .then(result => {
+        res.send(result.ops);
+    })
+
+    //ошибки
+    .catch(error => {
+        if (error.code == 11000) {
+            res.status(403).send({error: `User with name: ${req.body.name} already exists`});
         } else {
-            if (req.body[key]) obj[key] = req.body[key];
+            throw error;
         }
-    }
+    })
+    .catch(error => {
+        if (!error.code) {
+            throw error;
+        } else {
+            res.status(error.code).send(error.data);
+        }
+    })
+    .catch(error => {
+        res.status(500).send(error);
+    });
 
-    if (errors.length > 0) {
-        res.status(400).send({errors});
-        return;
-    }
-
-    db.collection('users').insert(obj)
-        .then(result => {
-            res.send(result.ops);
-        })
-        .catch(error => {
-            if (error.code == 11000) {
-                res.status(400).send({error: "Duplicates are forbidden"});
-            } else {
-                res.status(500).send({error});
-            }
-        });
 });
 
 router.delete('/:id', (req, res) => {
     let db = req.app.locals.mongo;
+    let id;
 
-    if (!ObjectId.isValid(req.params.id)){
-        res.status(400).send({error: "Id is invalid"});
-        return;
-    }
+    Promise.resolve()
+    //валидация id
+    .then(() => {
+        if (!ObjectId.isValid(req.params.id)) {
+            throw {code: 400, data: {error: `User id: ${req.params.id} is invalid`}};
+        } else {
+            id = ObjectId.ObjectID(req.params.id);
+        }
+    })
 
-    let id = new ObjectId.ObjectID(req.params.id);
+    //запрос
+    .then(() => {
+        return db.collection('users').deleteOne({_id: id});
+    })
+    .then(result => {
+        if (result.deletedCount === 0) {
+            throw {code: 404, data: {error: "User not found"}};
+        } else {
+            res.send({success: true});
+        }
+    })
 
-    db.collection('users').deleteOne({_id: id})
-        .then(result => {
-            if (result.deletedCount === 0) {
-                res.status(404).send({error: "User not found"});
-            } else {
-                res.send({success: true});
-            }
-        })
-        .catch(error => {
-            res.status(500).send({error});
-        });
+    //ошибки
+    .catch(error => {
+        if (!error.code) {
+            throw error;
+        } else {
+            res.status(error.code).send(error.data);
+        }
+    })
+    .catch(error => {
+        res.status(500).send(error);
+    });
 
 });
 
 router.patch('/:id', (req, res) => {
     let db = req.app.locals.mongo;
+    let id;
     let obj = {};
-    let errors = [];
 
-    if (!ObjectId.isValid(req.params.id)){
-        res.status(400).send({error: "Id is invalid"});
-        return;
-    }
-    let id = new ObjectId.ObjectID(req.params.id);
-
-    for (var key in model) {
-        let type = model[key].type;
-        if (type == "array") continue;
-
-        if (req.body[key] && typeof(req.body[key]) != type){
-            errors.push(`Field ${key} have to be a ${type}`);
-        }
-
-        if (key == 'password') {
-            if (req.body[key]) obj[key] = md5(req.body[key] + req.app.get('salt'));
+    Promise.resolve()
+    //валидация id
+    .then(() => {
+        if (!ObjectId.isValid(req.params.id)) {
+            throw {code: 400, data: {error: `User id: ${req.params.id} is invalid`}};
         } else {
-            if (req.body[key]) obj[key] = req.body[key];
+            id = ObjectId.ObjectID(req.params.id);
         }
-    }
+    })
 
-    if (errors.length > 0) {
-        res.status(400).send({errors});
-        return;
-    }
-    
-    db.collection('users').updateOne({_id: id}, {$set: obj})
-        .then(result => {
-            if (result.matchedCount == 0) {
-                res.status(404).send({error: "User not found"});
-            } else {
-                res.send({success: true});
-            }          
-        })
-        .catch(error => {
-            if (error.code == 11000) {
-                res.status(400).send({error: "Duplicates are forbidden"});
-            } else {
-                res.status(500).send({error});
+    //Проверка наличия параметров
+    .then(() => {
+        if (Object.keys(req.body).length === 0) {
+            throw {code: 400, data: {error: "Parameters for update are empty"}};
+        }
+    })
+
+    //валидация параметров
+    .then(() => {
+        if (req.body.name) {
+            if (typeof(req.body.name) !== "string") {
+                throw {code: 400, data: {error: "Parameter name has to be a string"}};
             }
-        });
+
+            obj.name = req.body.name;
+        }
+    })
+    .then(() => {
+        if (req.body.password) {
+            if (typeof(req.body.password) !== "string") {
+                throw {code: 400, data: {error: "Parameter password has to be a string"}};
+            }
+
+            obj.password = md5(req.body.password + req.app.get('salt'));
+        }
+    })
+
+    //Проверка наличия параметров для обновления
+    .then(() => {
+        if (Object.keys(obj).length === 0) {
+            throw {code: 400, data: {error: "Allowed parameters are not set"}};
+        }
+    })
+
+    //запрос
+    .then(() => {
+        return db.collection('users').updateOne({_id: id}, {$set: obj});
+    })
+    .then(result => {
+        if (result.matchedCount == 0) {
+            throw {code: 404, data: {error: "User not found"}}
+        } else {
+            return db.collection('users').findOne({_id: id});
+        }  
+    })
+    .then(result => {
+        res.send(result);
+    })
+
+     //ошибки
+    .catch(error => {
+        if (error.code == 11000) {
+            res.status(403).send({error: `User with name: ${req.body.name} already exists`});
+        } else {
+            throw error;
+        }
+    })
+    .catch(error => {
+        if (!error.code) {
+            throw error;
+        } else {
+            res.status(error.code).send(error.data);
+        }
+    })
+    .catch(error => {
+        res.status(500).send(error);
+    });  
 
 });
+
+
+
+
+
+
+
+
 
 
 
 
 router.get('/:id/libraries', (req, res) => {
     let db = req.app.locals.mongo;
+    let id;
 
-    if (!ObjectId.isValid(req.params.id)){
-        res.status(400).send({error: "Id is invalid"});
-        return;
-    }
+     Promise.resolve()
+    //валидация id
+    .then(() => {
+        if (!ObjectId.isValid(req.params.id)) {
+            throw {code: 400, data: {error: `User id: ${req.params.id} is invalid`}};
+        } else {
+            id = ObjectId.ObjectID(req.params.id);
+        }
+    })   
 
-    let id = new ObjectId.ObjectID(req.params.id);
+    //запрос
+    .then(() => {
+        return db.collection('users').findOne({_id: id});
+    })
+    .then(result => {
+        if (!result) {
+            throw {code: 404, data: {error: "User not found"}};
+        } else {
+            return result.libraries;
+        }
+    })
+    .then(result => {
+        res.send(result);
+    })
 
-    db.collection('users').findOne({_id: id})
-        .then(result => {
-            if (!result) {
-                res.status(404).send({error: "User not found"});
-            } else {
-                res.send(result.libraries);
-            }
-        })
-        .catch(error => {
-            res.status(500).send({error});
-        });
+    //ошибки
+    .catch(error => {
+        if (!error.code) {
+            throw error;
+        } else {
+            res.status(error.code).send(error.data);
+        }
+    })
+    .catch(error => {
+        res.status(500).send(error);
+    });
+
 });
 
 router.get('/:id/libraries/:idp', (req, res) => {
     let db = req.app.locals.mongo;
+    let id, idp;
 
-    if (!ObjectId.isValid(req.params.id) || !ObjectId.isValid(req.params.idp)) {
-        res.status(400).send({error: "Id is invalid"});
-        return;
-    }
+    Promise.resolve()
+    //валидация id
+    .then(() => {
+        if (!ObjectId.isValid(req.params.id)) {
+            throw {code: 400, data: {error: `User id: ${req.params.id} is invalid`}};
+        } else {
+            id = ObjectId.ObjectID(req.params.id);
+        }
+    })
+    .then(() => {
+        if (!ObjectId.isValid(req.params.idp)) {
+            throw {code: 400, data: {error: `Platform id: ${req.params.idp} is invalid`}};
+        } else {
+            idp = ObjectId.ObjectID(req.params.idp);
+        }
+    })
 
-    let id = new ObjectId.ObjectID(req.params.id);
-    let idp = new ObjectId.ObjectID(req.params.idp);
+    //запрос
+    .then(() => {
+        return db.collection('users').findOne({_id: id});
+    })
+    .then(result => {
+        if (!result) {
+            throw {code: 404, data: {error: "User not found"}};
+        } else {
+            return result.libraries;
+        }
+    })
 
-    db.collection('users').findOne({_id: id})
-        .then(result => {
-            if (!result) {
-                res.status(404).send({error: "User not found"});
-            } else {
-                let library = null;
-                result.libraries.forEach((el, i, arr) => {
-                    if (el.platform && el.platform._id == req.params.idp) {
-                        library = el;
-                    }
-                });
-                if (library == null) {
-                    res.status(404).send({error: "Library not found"});
-                } else {
-                   res.send(library);
-                }               
-            }
-        })
-        .catch(error => {
-            res.status(500).send({error});
-        });
+    //поиск библиотеки
+    .then(libraries => {
+        return libraries.find(i => i.platform._id.equals(idp));
+    })
+    .then(library => {
+        if (!library) {
+            throw {code: 404, data: {error: "Library not found"}};
+        } else {
+            res.send(library);
+        }
+    })
+
+    //ошибки
+    .catch(error => {
+        if (!error.code) {
+            throw error;
+        } else {
+            res.status(error.code).send(error.data);
+        }
+    })
+    .catch(error => {
+        res.status(500).send(error);
+    });
+
 });
 
 router.put('/:id/libraries', (req, res) => {
     let db = req.app.locals.mongo;
+    let id, idp;
+    let obj;
 
-    if (!ObjectId.isValid(req.params.id)) {
-        res.status(400).send({error: "Id is invalid"});
-        return;
-    }
+    Promise.resolve()
+    //валидация id
+    .then(() => {
+        if (!ObjectId.isValid(req.params.id)) {
+            throw {code: 400, data: {error: `User id: ${req.params.id} is invalid`}};
+        } else {
+            id = ObjectId.ObjectID(req.params.id);
+        }
+    })
 
-    let id = new ObjectId.ObjectID(req.params.id);
+    //валидация параметров
+    .then(() => {
+        if (!req.body.platform) {
+            throw {code: 400, data: {error:"Parameter platform is required"}};
+        }
+        if (!ObjectId.isValid(req.body.platform)) {
+            throw {code: 400, data: {error: `Platform id: ${req.body.platform} is invalid`}};
+        }
+        idp = ObjectId.ObjectID(req.body.platform);
+    })
 
-    if (!req.body.platform) {
-        res.status(400).send({error: "Parameter #platform# is required"});
-        return;
-    }
-    if (!ObjectId.isValid(req.body.platform)) {
-        res.status(400).send({error: `Platform id: ${req.body.platform} is invalid`});
-        return;
-    }
-    
-    let platformId = new ObjectId.ObjectID(req.body.platform);
+    //запрос плафтормы
+    .then(() => {
+        return db.collection('platforms').findOne({_id: idp});
+    })
+    .then(result => {
+        if (!result) {
+            throw {code: 404, data: {error: "Platform not found"}};
+        } else {
+            return result;
+        }
+    })
 
-    db.collection('users').findOne({_id: id})
-        .then(result => {
-            if (!result) {
-                throw {code: 404, data: {error: "User not found"}};
-            } else {
-                let exist = false;
-                result.libraries.forEach(el => {
-                    if (el.platform && el.platform._id == req.body.platform) {
-                        exist = true;
-                    }
-                });
+    //создание объекта
+    .then(platform => {
+        obj = {
+            platform: {
+                _id: platform._id,
+                name: platform.name
+            },
+            games: []
+        };
+    })
 
-                if (exist) {
-                    throw {code: 400, data: {error: "Platform already exists"}};
-                } else {
-                    return db.collection('platforms').findOne({_id: platformId});
-                }
-            }
-        })
-        .then(result => {
-            if (result == null) {
-                throw {code: 404, data: {error: "Platform not found"}};
-            } else {
-                let obj = {
-                    platform: {
-                        _id: req.body.platform,
-                        name: result.name
-                    },
-                    games: []
-                };
-                return db.collection('users').updateOne({_id: id}, {$addToSet: {libraries: obj}});
-            }
-        })
-        .then(result => {
-            res.send({success: true});
-        })
-        .catch(error => {
-            if (error.code) {
-                res.status(error.code).send(error.data);
-            } else {
-                res.status(500).send({error});
-            }            
-        });
+    //проверка существования библиотеки для данной платформы
+    .then(() => {
+        return db.collection('users').findOne({_id: id});
+    })
+    .then(result => {
+        if (!result) {
+            throw {code: 404, data: {error: "User not found"}};
+        } else {
+            return result.libraries.find(i => i.platform._id.equals(idp));
+        }
+    })
+    .then(platform => {
+        if (platform) {
+            throw {code: 403, data: {error: `Library with platform ${idp.toString()} is already exists`}};
+        }
+    })
+
+    //добавление объекта
+    .then(() => {
+        return db.collection('users').updateOne({_id: id}, {$addToSet: {libraries: obj}});
+    })
+    .then(result => {
+        if (result.matchedCount == 0) {
+            throw {code: 404, data: {error: "User not found"}};
+        } else {
+            return db.collection('users').findOne({_id: id});
+        }
+    })
+    .then(user => {
+        return user.libraries.find(i => i.platform._id.equals(idp));
+    })
+    .then(library => {
+        res.send(library);
+    })  
+
+    //ошибки
+    .catch(error => {
+        if (!error.code) {
+            throw error;
+        } else {
+            res.status(error.code).send(error.data);
+        }
+    })
+    .catch(error => {
+        res.status(500).send(error);
+    });  
 
 });
 
 router.delete('/:id/libraries/:idp', (req, res) => {
     let db = req.app.locals.mongo;
+    let id, idp;
 
-    if (!ObjectId.isValid(req.params.id) || !ObjectId.isValid(req.params.idp)) {
-        res.status(400).send({error: "Id is invalid"});
-        return;
-    }
+    Promise.resolve()
+    //валидация id
+    .then(() => {
+        if (!ObjectId.isValid(req.params.id)) {
+            throw {code: 400, data: {error: `Game id: ${req.params.id} is invalid`}};
+        } else {
+            id = ObjectId.ObjectID(req.params.id);
+        }
+    })
+    .then(() => {
+        if (!ObjectId.isValid(req.params.idp)) {
+            throw {code: 400, data: {error: `Platform id: ${req.params.idp} is invalid`}};
+        } else {
+            idp = ObjectId.ObjectID(req.params.idp);
+        }
+    })
 
-    let id = new ObjectId.ObjectID(req.params.id);
-    let idp = new ObjectId.ObjectID(req.params.idp);
+    //запрос
+    .then(() => {
+        return db.collection('users').updateOne({_id: id}, {$pull: {libraries: {"platform._id": idp}}});
+    })
+    .then(result => {
+        if (result.matchedCount === 0) {
+            throw {code: 404, data: {error: "User not found"}};
+        }
+        if (result.modifiedCount === 0) {
+            throw {code: 404, data: {error: "Library not found"}};
+        }
+        res.send({success: true});
+    })
 
-    db.collection('users').findOne({_id: id})
-        .then(result => {
-            if (!result) {
-                throw {code: 404, data: {error: "User not found"}};
-            } else {
-                let libraries = [];
-                result.libraries.forEach(el => {
-                    if (!el.platform || !el.platform._id == req.params.idp) {
-                        libraries.push(el);
-                    }
-                });
-                if (result.libraries.length === libraries.length) {
-                    throw {code: 404, data: {error: "Platform not found"}};
-                } else {
-                    return db.collection('users').updateOne({_id: id}, {libraries});
-                }
-            }
-        })
-        .then(result => {
-            res.send({success: true});
-        })
-        .catch(error => {
-            if (error.code) {
-                res.status(error.code).send(error.data);
-            } else {
-                res.status(500).send({error});
-            } 
-        });
+    //ошибки
+    .catch(error => {
+        if (!error.code) {
+            throw error;
+        } else {
+            res.status(error.code).send(error.data);
+        }
+    })
+    .catch(error => {
+        res.status(500).send(error);
+    }); 
+
 });
 
 

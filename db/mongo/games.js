@@ -100,6 +100,7 @@ router.get('/', (req, res) => {
         res.send(result);
     })
 
+    //ошибки
     .catch(error => {
         if (!error.code) {
             throw error;
@@ -372,12 +373,7 @@ router.patch('/:id', (req, res) => {
 
 router.get('/:id/releases', (req, res) => {
     let db = req.app.locals.mongo;
-
     let id;
-
-    let filter = {};
-    let sort = {};
-    let limit = 10, skip = 0;
 
     Promise.resolve()
     //валидация id
@@ -558,7 +554,7 @@ router.put('/:id/releases', (req, res) => {
         }
     })
 
-    //добавление объекта
+    //запрос
     .then(() => {
         return db.collection('games').updateOne({_id: id}, {$addToSet: {releases: obj}});
     })
@@ -569,9 +565,13 @@ router.put('/:id/releases', (req, res) => {
             return db.collection('games').findOne({_id: id});
         }
     })
-    .then(result => {
-        res.send(result);
+    .then(game => {
+        return game.releases.find(i => i.platform._id.equals(idp));
     })
+    .then(release => {
+        res.send(release);
+    })  
+
 
     //ошибки
     .catch(error => {
