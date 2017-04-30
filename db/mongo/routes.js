@@ -1,6 +1,6 @@
 const router = require('express').Router();
 const bodyParser = require('body-parser');
-const functions = require('./functions');
+const reset = require('./reset');
 const gamesRouter = require('./games');
 const platformsRouter = require('./platforms');
 const usersRouter = require('./users');
@@ -11,7 +11,7 @@ router.get('/', (req, res) => {
     res.render('mongodoc');
 });
 
-router.post('/reset', functions.resetDB);
+router.post('/reset', reset.resetDB);
 
 
 router.use('/platforms', platformsRouter);
