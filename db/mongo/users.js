@@ -308,8 +308,6 @@ router.patch('/:id', (req, res) => {
 
 
 
-
-
 router.get('/:id/libraries', (req, res) => {
     let db = req.app.locals.mongo;
     let id;
@@ -415,7 +413,6 @@ router.get('/:id/libraries/:idp', (req, res) => {
 router.put('/:id/libraries', (req, res) => {
     let db = req.app.locals.mongo;
     let id, idp;
-    let obj;
 
     Promise.resolve()
     //валидация id
@@ -438,29 +435,6 @@ router.put('/:id/libraries', (req, res) => {
         idp = ObjectId.ObjectID(req.body.platform);
     })
 
-    //запрос плафтормы
-    .then(() => {
-        return db.collection('platforms').findOne({_id: idp});
-    })
-    .then(result => {
-        if (!result) {
-            throw {code: 404, data: {error: "Platform not found"}};
-        } else {
-            return result;
-        }
-    })
-
-    //создание объекта
-    .then(platform => {
-        obj = {
-            platform: {
-                _id: platform._id,
-                name: platform.name
-            },
-            games: []
-        };
-    })
-
     //проверка существования библиотеки для данной платформы
     .then(() => {
         return db.collection('users').findOne({_id: id});
@@ -478,8 +452,32 @@ router.put('/:id/libraries', (req, res) => {
         }
     })
 
-    //добавление объекта
+    //запрос плафтормы
     .then(() => {
+        return db.collection('platforms').findOne({_id: idp});
+    })
+    .then(result => {
+        if (!result) {
+            throw {code: 404, data: {error: "Platform not found"}};
+        } else {
+            return result;
+        }
+    })
+
+    //создание объекта
+    .then(platform => {
+        let obj = {
+            platform: {
+                _id: platform._id,
+                name: platform.name
+            },
+            games: []
+        };
+        return obj;
+    })
+
+    //добавление объекта
+    .then(obj => {
         return db.collection('users').updateOne({_id: id}, {$addToSet: {libraries: obj}});
     })
     .then(result => {
@@ -518,7 +516,7 @@ router.delete('/:id/libraries/:idp', (req, res) => {
     //валидация id
     .then(() => {
         if (!ObjectId.isValid(req.params.id)) {
-            throw {code: 400, data: {error: `Game id: ${req.params.id} is invalid`}};
+            throw {code: 400, data: {error: `User id: ${req.params.id} is invalid`}};
         } else {
             id = ObjectId.ObjectID(req.params.id);
         }
@@ -563,131 +561,328 @@ router.delete('/:id/libraries/:idp', (req, res) => {
 
 
 
+
+
+
+
+
 router.get('/:id/libraries/:idp/games', (req, res) => {
     let db = req.app.locals.mongo;
+    let id, idp;
 
-    if (!ObjectId.isValid(req.params.id) || !ObjectId.isValid(req.params.idp)){
-        res.status(400).send({error: "Id is invalid"});
-        return;
-    }
+    Promise.resolve()
+    //валидация id
+    .then(() => {
+        if (!ObjectId.isValid(req.params.id)) {
+            throw {code: 400, data: {error: `User id: ${req.params.id} is invalid`}};
+        } else {
+            id = ObjectId.ObjectID(req.params.id);
+        }
+    })
+    .then(() => {
+        if (!ObjectId.isValid(req.params.idp)) {
+            throw {code: 400, data: {error: `Platform id: ${req.params.idp} is invalid`}};
+        } else {
+            idp = ObjectId.ObjectID(req.params.idp);
+        }
+    })
 
-    let id = new ObjectId.ObjectID(req.params.id);
-    let idp = new ObjectId.ObjectID(req.params.idp);
+    //запрос
+    .then(() => {
+        return db.collection('users').findOne({_id: id});
+    })
+    .then(result => {
+        if (!result) {
+            throw {code: 404, data: {error: "User not found"}};
+        } else {
+            return result.libraries;
+        }
+    })
 
-    db.collection('users').findOne({_id: id})
-        .then(result => {
-            if (!result) {
-                throw {code: 404, data: {error: "User not found"}};
-            } else {
-                return result;
-            }
-        })
-        .then(user => {
-            let games = null;
-            user.libraries.forEach(el => {
-                if (el.platform && el.platform._id == req.params.idp) {
-                    games = el.games;
-                }
-            });
-            if (games === null) {
-                throw new {code: 404, data: {error: "Library not found"}};
-            } else {
-                return games;
-            }
-        })
-        .then(games => {
-            res.send(games);
-        })
-        .catch(error => {
-            if (error.code) {
-                res.status(error.code).send(error.data);
-            } else {
-                throw error;
-            }
-        })
-        .catch(error => {
-            res.status(500).send({error});
-        });
+    //поиск библиотеки
+    .then(libraries => {
+        return libraries.find(i => i.platform._id.equals(idp));
+    })
+    .then(library => {
+        if (!library) {
+            throw {code: 404, data: {error: "Library not found"}};
+        } else {
+            return library.games;
+        }
+    })
+    .then(games => {
+        res.send(games);
+    })
+
+    //ошибки
+    .catch(error => {
+        if (!error.code) {
+            throw error;
+        } else {
+            res.status(error.code).send(error.data);
+        }
+    })
+    .catch(error => {
+        res.status(500).send(error);
+    });
+
 });
 
 router.get('/:id/libraries/:idp/games/:idg', (req, res) => {
     let db = req.app.locals.mongo;
+    let id, idp, idg;
 
-    if (!ObjectId.isValid(req.params.id)
-        || !ObjectId.isValid(req.params.idp)
-        || !ObjectId.isValid(req.params.idg)
-        ) {
-        res.status(400).send({error: "Id is invalid"});
-        return;
-    }
+    Promise.resolve()
+    //валидация id
+    .then(() => {
+        if (!ObjectId.isValid(req.params.id)) {
+            throw {code: 400, data: {error: `User id: ${req.params.id} is invalid`}};
+        } else {
+            id = ObjectId.ObjectID(req.params.id);
+        }
+    })
+    .then(() => {
+        if (!ObjectId.isValid(req.params.idp)) {
+            throw {code: 400, data: {error: `Platform id: ${req.params.idp} is invalid`}};
+        } else {
+            idp = ObjectId.ObjectID(req.params.idp);
+        }
+    })
+    .then(() => {
+        if (!ObjectId.isValid(req.params.idg)) {
+            throw {code: 400, data: {error: `Game id: ${req.params.idg} is invalid`}};
+        } else {
+            idg = ObjectId.ObjectID(req.params.idg);
+        }
+    })
 
-    let id = new ObjectId.ObjectID(req.params.id);
-    let idp = new ObjectId.ObjectID(req.params.idp);
-    let idg = new ObjectId.ObjectID(req.params.idg);
+    //запрос
+    .then(() => {
+        return db.collection('users').findOne({_id: id});
+    })
+    .then(result => {
+        if (!result) {
+            throw {code: 404, data: {error: "User not found"}};
+        } else {
+            return result.libraries;
+        }
+    })
 
-    db.collection('users').findOne({_id: id})
-        .then(result => {
-            if (!result) {
-                throw {code: 404, data: {error: "User not found"}};
-            } else {
-                return result;
-            }
-        })
-        .then(user => {
-            let games = null;
-            user.libraries.forEach(el => {
-                if (el.platform && el.platform._id == req.params.idp) {
-                    games = el.games;
-                }
-            });
-            if (games === null) {
-                throw new {code: 404, data: {error: "Library not found"}};
-            } else {
-                return games;
-            }
-        })
-        .then(games => {
-            let game = null;
-            games.forEach(el => {
-                if (el._id === req.params.idp) {
-                    game = el;
-                }
-            });
-            if (game === null) {
-                throw {code: 404, data: {error: "Game not found"}};
-            } else {
-                return game;
-            }
-        })
-        .then(game => {
-            res.send(game);
-        })
-        .catch(error => {
-            if (error.code) {
-                res.status(error.code).send(error.data);
-            } else {
-                throw error;
-            }
-        })
-        .catch(error => {
-            res.status(500).send({error});
-        });
-});
+    //поиск библиотеки
+    .then(libraries => {
+        return libraries.find(i => i.platform._id.equals(idp));
+    })
+    .then(library => {
+        if (!library) {
+            throw {code: 404, data: {error: "Library not found"}};
+        } else {
+            return library.games;
+        }
+    })
 
-router.put('/:id/libraries/:idp', (req, res) => {
-    if (!ObjectId.isValid(req.params.id)
-        || !ObjectId.isValid(req.params.idp)
-        ) {
-        res.status(400).send({error: "Id is invalid"});
-        return;
-    }
+    //поиск игры
+    .then(games => {
+        return games.find(i => i._id.equals(idg));
+    })
+    .then(game => {
+        res.send(game);
+    })
 
-    let id = new ObjectId.ObjectID(req.params.id);
-    let idp = new ObjectId.ObjectID(req.params.idp);
-
-    
+    //ошибки
+    .catch(error => {
+        if (!error.code) {
+            throw error;
+        } else {
+            res.status(error.code).send(error.data);
+        }
+    })
+    .catch(error => {
+        res.status(500).send(error);
+    });
 
 });
 
+router.put('/:id/libraries/:idp/games', (req, res) => {
+    let db = req.app.locals.mongo;
+    let id, idp, idg;
+
+    Promise.resolve()
+    //валидация id
+    .then(() => {
+        if (!ObjectId.isValid(req.params.id)) {
+            throw {code: 400, data: {error: `User id: ${req.params.id} is invalid`}};
+        } else {
+            id = ObjectId.ObjectID(req.params.id);
+        }
+    })
+    .then(() => {
+        if (!ObjectId.isValid(req.params.idp)) {
+            throw {code: 400, data: {error: `Platform id: ${req.params.idp} is invalid`}};
+        } else {
+            idp = ObjectId.ObjectID(req.params.idp);
+        }
+    })
+
+    //валидация параметров
+    .then(() => {
+        if (!req.body.game) {
+            throw {code: 400, data: {error:"Parameter game is required"}};
+        }
+        if (!ObjectId.isValid(req.body.game)) {
+            throw {code: 400, data: {error: `Game id: ${req.body.game} is invalid`}};
+        }
+        idg = ObjectId.ObjectID(req.body.game);
+    })
+
+    //проверка существования библиотеки для данной платформы
+    .then(() => {
+        return db.collection('users').findOne({_id: id});
+    })
+    .then(result => {
+        if (!result) {
+            throw {code: 404, data: {error: "User not found"}};
+        } else {
+            return result.libraries;
+        }
+    })
+    .then(libraries => {
+        return libraries.find(i => i.platform._id.equals(idp));
+    })
+    .then(library => {
+        if (!library) {
+            throw {code: 404, data: {error: "Library not found"}};
+        } else {
+            return library.games;
+        }
+    })
+    .then(games => {
+        return games.find(i => i._id.equals(idg));
+    })
+    .then(game => {
+        if (game) {
+            throw {code: 403, data: {error: `Game ${idg.toString()} is already exists`}};
+        }
+    })
+
+    //запрос игры
+    .then(() => {
+        return db.collection('games').findOne({_id: idg});
+    })
+    .then(result => {
+        if (!result) {
+            throw {code: 404, data: {error: "Game not found"}};
+        } else {
+            return result;
+        }
+    })
+
+    //проверка наличия релиза игры для данной платформы
+    .then(game => {
+        if (game.releases.find(i => i.platform._id.equals(idp))) {
+            return game;
+        } else {
+            throw {code: 403, data:{error: `Game ${idg.toString()} hasn't released on platform ${idp.toString()} yet`}};
+        }
+    })
+
+    //создание объекта
+    .then(game => {
+        let obj = {
+            _id: game._id,
+            name: game.name
+        };
+        return obj;
+    })
+
+    //добавление объекта
+    .then(obj => {
+        return db.collection('users').updateOne({_id: id, "libraries.platform._id": idp}, {$addToSet: {"libraries.$.games": obj}});
+    })
+    .then(result => {
+        if (result.matchedCount == 0) {
+            throw {code: 404, data: {error: "User or library not found"}};
+        } else {
+            return db.collection('users').findOne({_id: id});
+        }
+    })
+    .then(user => {
+        return user.libraries.find(i => i.platform._id.equals(idp));
+    })
+    .then(library => {
+        return library.games.find(i => i._id.equals(idg));
+    })  
+    .then(game => {
+        res.send(game);
+    })
+
+    //ошибки
+    .catch(error => {
+        if (!error.code) {
+            throw error;
+        } else {
+            res.status(error.code).send(error.data);
+        }
+    })
+    .catch(error => {
+        res.status(500).send(error);
+    });    
+
+});
+
+router.delete('/:id/libraries/:idp/games/:idg', (req, res) => {
+    let db = req.app.locals.mongo;
+    let id, idp, idg;
+
+    Promise.resolve()
+    //валидация id
+    .then(() => {
+        if (!ObjectId.isValid(req.params.id)) {
+            throw {code: 400, data: {error: `User id: ${req.params.id} is invalid`}};
+        } else {
+            id = ObjectId.ObjectID(req.params.id);
+        }
+    })
+    .then(() => {
+        if (!ObjectId.isValid(req.params.idp)) {
+            throw {code: 400, data: {error: `Platform id: ${req.params.idp} is invalid`}};
+        } else {
+            idp = ObjectId.ObjectID(req.params.idp);
+        }
+    })
+    .then(() => {
+        if (!ObjectId.isValid(req.params.idg)) {
+            throw {code: 400, data: {error: `Game id: ${req.params.idg} is invalid`}};
+        } else {
+            idg = ObjectId.ObjectID(req.params.idg);
+        }
+    })
+
+    //запрос
+    .then(() => {
+        return db.collection('users').updateOne({_id: id, "libraries.platform._id": idp}, {$pull: {"libraries.$.games": {"_id": idg}}});
+    })
+    .then(result => {
+        if (result.matchedCount === 0) {
+            throw {code: 404, data: {error: "User or platform not found"}};
+        }
+        if (result.modifiedCount === 0) {
+            throw {code: 404, data: {error: "Game not found"}};
+        }
+        res.send({success: true});
+    })
+
+    //ошибки
+    .catch(error => {
+        if (!error.code) {
+            throw error;
+        } else {
+            res.status(error.code).send(error.data);
+        }
+    })
+    .catch(error => {
+        res.status(500).send(error);
+    }); 
+
+});
 
 module.exports = router;

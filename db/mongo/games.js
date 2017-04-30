@@ -476,7 +476,6 @@ router.get('/:id/releases/:idp', (req, res) => {
 router.put('/:id/releases', (req, res) => {
     let db = req.app.locals.mongo;
     let id, idp;
-    let obj;
 
     Promise.resolve()
     //валидация id
@@ -513,6 +512,24 @@ router.put('/:id/releases', (req, res) => {
         }
     })
 
+    //проверка существования релиза для данной платформы
+    .then(() => {
+        return db.collection('games').findOne({_id: id});
+    })
+    .then(result => {
+        if (!result) {
+            throw {code: 404, data: {error: "Game not found"}};
+        } else {
+            return result.releases.find(i => i.platform._id.equals(idp));
+        }
+    })
+    .then(platform => {
+        if (platform) {
+            throw {code: 403, data: {error: `Release with platform ${idp.toString()} is already exists`}};
+        }
+    })
+
+
     //запрос плафтормы
     .then(() => {
         return db.collection('platforms').findOne({_id: idp});
@@ -535,27 +552,12 @@ router.put('/:id/releases', (req, res) => {
         };
         if (req.body.price) obj.price = req.body.price;
         if (req.body.date) obj.date = req.body.date;
-    })
 
-    //проверка существования релиза для данной платформы
-    .then(() => {
-        return db.collection('games').findOne({_id: id});
-    })
-    .then(result => {
-        if (!result) {
-            throw {code: 404, data: {error: "Game not found"}};
-        } else {
-            return result.releases.find(i => i.platform._id.equals(idp));
-        }
-    })
-    .then(platform => {
-        if (platform) {
-            throw {code: 403, data: {error: `Release with platform ${idp.toString()} is already exists`}};
-        }
+        return obj;
     })
 
     //запрос
-    .then(() => {
+    .then(obj => {
         return db.collection('games').updateOne({_id: id}, {$addToSet: {releases: obj}});
     })
     .then(result => {
