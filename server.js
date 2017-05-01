@@ -24,57 +24,12 @@ app.locals.mysql = mysql.createPool({
 });
 
 app.set('port', (process.env.PORT || 3000));
-app.set('salt', config.mongo.connectionString);
-app.set('views', __dirname + '/views');
-app.set('view engine', 'pug');
-
+app.set('salt', config.salt);
 
 app.use(express.static(__dirname + '/public'));
 
-
-app.get('/', function(req, res) {
-  res.render('doc.pug');
-});
-
-
-app.get('/test', (req, res) =>{
-  let db = app.locals.mongo;
-
-  let collection = db.collection('test');
-  let doc1 = {'hello':'doc1'};
-  let doc2 = {'hello':'doc2'};
-  let lotsOfDocs = [{'hello':'doc3'}, {'hello':'doc4'}];
-
-  collection.insert(doc1);
-
-  collection.insert(doc2, {w:1}, function(err, result) {});
-
-  collection.insert(lotsOfDocs, {w:1}, function(err, result) {});
-
-  res.send('Done');
-});
-
-
-app.get('/mysql', (req, res) => {
-  let db = app.locals.mysql;
-
-  db.getConnection(function(err,connection){
-
-    connection.query("select * from test", (err,rows) => {
-      connection.release();
-      if(!err) {
-        res.json(rows);
-      } else {
-        res.json({error: true});
-      } 
-    }); 
-
-  });
-});
-
 app.use('/mongo', mongoRouter);
 app.use('/mysql', mysqlRouter);
-
 
 app.listen(app.get('port'), function() {
   console.log('Node app is running on port', app.get('port'));

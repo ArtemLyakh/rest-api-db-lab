@@ -14,8 +14,7 @@
     "express": "^4.15.2",
     "md5": "^2.2.1",
     "mongodb": "^2.2.26",
-    "mysql": "^2.13.0",
-    "pug": "^2.0.0-beta.12"
+    "mysql": "^2.13.0"
   },
   "devDependencies": {},
   "author": "ArtemLyakh"

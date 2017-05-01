@@ -7,16 +7,10 @@ const usersRouter = require('./users');
 
 router.use(bodyParser.json());
 
-router.get('/', (req, res) => {
-    res.render('mongodoc');
-});
-
 router.post('/reset', reset.resetDB);
-
 
 router.use('/platforms', platformsRouter);
 router.use('/games', gamesRouter);
 router.use('/users', usersRouter);
-
 
 module.exports = router;
