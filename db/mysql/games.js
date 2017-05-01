@@ -62,7 +62,7 @@ router.get('/', (req, res) => {
     //сортировка
     .then(() => {
         if (req.query.sort) {
-            if (["name", "company", "controller", "store"].indexOf(req.query.sort) === -1) {
+            if (["name", "genre", "rating"].indexOf(req.query.sort) === -1) {
                 throw {code: 400, data: {error: "Parameter sort is invalid"}};
             } else {
                 if (!req.query.order || req.query.order === "asc") {
