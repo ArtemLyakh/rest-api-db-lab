@@ -663,29 +663,67 @@ router.patch('/:id', (req, res) => {
 
 
 router.get('/:id/libraries', (req, res) => {
-    let db = req.app.locals.mongo;
+    let db;
     let id;
 
      Promise.resolve()
     //валидация id
     .then(() => {
-        if (!ObjectId.isValid(req.params.id)) {
+        id = parseInt(req.params.id);
+        if (isNaN(id)) {
             throw {code: 400, data: {error: `User id: ${req.params.id} is invalid`}};
-        } else {
-            id = ObjectId.ObjectID(req.params.id);
         }
     })   
 
-    //запрос
+    //подключение
     .then(() => {
-        return db.collection('users').findOne({_id: id});
+        return GetConnection(req.app.locals.mysql);
+    })     
+    .then(connection => {
+        db = connection;
+    })
+    //подготовка запроса
+    .then(() => {
+        return [
+            'SELECT',
+            [
+                'p.id as platformId',
+                'p.name as platformName',
+                'GROUP_CONCAT(IFNULL(g.id, "") SEPARATOR ";") as gameIds',
+                'GROUP_CONCAT(IFNULL(g.name, "") SEPARATOR ";") as gameNames'
+            ].join(', '),
+            'FROM user_libraries as ul',
+            'LEFT OUTER JOIN platforms as p ON ul.id_platform = p.id',
+            'LEFT OUTER JOIN user_libraries_games as ulg ON ul.id = ulg.id_user_library',
+            'LEFT OUTER JOIN games as g ON ulg.id_game = g.id',
+            `WHERE ul.id_user = ${db.escape(id)}`,
+            'GROUP BY p.id, p.name'
+        ].join(' ');
+    })
+    //запрос
+    .then(query => {
+        return Query(db, query);
     })
     .then(result => {
-        if (!result) {
-            throw {code: 404, data: {error: "User not found"}};
-        } else {
-            return result.libraries;
-        }
+        return result.result.map(el => {
+            let gameIds = el.gameIds ? el.gameIds.split(';').map(i => i ? i : null) : [];
+            let gameNames = el.gameNames ? el.gameNames.split(';').map(i => i ? i : null) : [];
+            let obj = {
+                platform: {
+                    _id: el.platformId,
+                    name: el.platformName
+                },
+                games: []
+            };
+            for (let i = 0; i < gameIds.length; i++) {
+                let game = {
+                    _id: gameIds[i],
+                    name: gameNames[i]
+                };
+                obj.games.push(game);
+            }
+            return obj;
+        });
     })
     .then(result => {
         res.send(result);
@@ -706,48 +744,80 @@ router.get('/:id/libraries', (req, res) => {
 });
 
 router.get('/:id/libraries/:idp', (req, res) => {
-    let db = req.app.locals.mongo;
+    let db ;
     let id, idp;
 
     Promise.resolve()
     //валидация id
     .then(() => {
-        if (!ObjectId.isValid(req.params.id)) {
+        id = parseInt(req.params.id);
+        if (isNaN(id)) {
             throw {code: 400, data: {error: `User id: ${req.params.id} is invalid`}};
-        } else {
-            id = ObjectId.ObjectID(req.params.id);
         }
     })
     .then(() => {
-        if (!ObjectId.isValid(req.params.idp)) {
+        idp = parseInt(req.params.idp);
+        if (isNaN(idp)) {
             throw {code: 400, data: {error: `Platform id: ${req.params.idp} is invalid`}};
-        } else {
-            idp = ObjectId.ObjectID(req.params.idp);
         }
     })
 
-    //запрос
+    //подключение
     .then(() => {
-        return db.collection('users').findOne({_id: id});
+        return GetConnection(req.app.locals.mysql);
+    })     
+    .then(connection => {
+        db = connection;
+    })
+
+    //подготовка запроса
+    .then(() => {
+        return [
+            'SELECT',
+            [
+                'p.id as platformId',
+                'p.name as platformName',
+                'GROUP_CONCAT(IFNULL(g.id, "") SEPARATOR ";") as gameIds',
+                'GROUP_CONCAT(IFNULL(g.name, "") SEPARATOR ";") as gameNames'
+            ].join(', '),
+            'FROM user_libraries as ul',
+            'LEFT OUTER JOIN platforms as p ON ul.id_platform = p.id',
+            'LEFT OUTER JOIN user_libraries_games as ulg ON ul.id = ulg.id_user_library',
+            'LEFT OUTER JOIN games as g ON ulg.id_game = g.id',
+            `WHERE ul.id_user = ${db.escape(id)} AND p.id = ${db.escape(idp)}`,
+            'GROUP BY p.id, p.name'
+        ].join(' ');
+    })
+    //запрос
+    .then(query => {
+        return Query(db, query);
     })
     .then(result => {
-        if (!result) {
-            throw {code: 404, data: {error: "User not found"}};
+        if (result.result.length === 0) {
+            throw {code: 404, data: {error: "User or platform not found"}};
         } else {
-            return result.libraries;
+            let el = result.result[0];
+            let gameIds = el.gameIds ? el.gameIds.split(';').map(i => i ? i : null) : [];
+            let gameNames = el.gameNames ? el.gameNames.split(';').map(i => i ? i : null) : [];
+            let obj = {
+                platform: {
+                    _id: el.platformId,
+                    name: el.platformName
+                },
+                games: []
+            };
+            for (let i = 0; i < gameIds.length; i++) {
+                let game = {
+                    _id: gameIds[i],
+                    name: gameNames[i]
+                };
+                obj.games.push(game);
+            }
+            return obj;
         }
     })
-
-    //поиск библиотеки
-    .then(libraries => {
-        return libraries.find(i => i.platform._id.equals(idp));
-    })
-    .then(library => {
-        if (!library) {
-            throw {code: 404, data: {error: "Library not found"}};
-        } else {
-            res.send(library);
-        }
+    .then(result => {
+        res.send(result);
     })
 
     //ошибки
@@ -771,10 +841,9 @@ router.put('/:id/libraries', (req, res) => {
     Promise.resolve()
     //валидация id
     .then(() => {
-        if (!ObjectId.isValid(req.params.id)) {
+        id = parseInt(req.params.id);
+        if (isNaN(id)) {
             throw {code: 400, data: {error: `User id: ${req.params.id} is invalid`}};
-        } else {
-            id = ObjectId.ObjectID(req.params.id);
         }
     })
 
@@ -783,70 +852,92 @@ router.put('/:id/libraries', (req, res) => {
         if (!req.body.platform) {
             throw {code: 400, data: {error:"Parameter platform is required"}};
         }
-        if (!ObjectId.isValid(req.body.platform)) {
+        idp = parseInt(req.body.platform);
+        if (isNaN(idp)) {
             throw {code: 400, data: {error: `Platform id: ${req.body.platform} is invalid`}};
         }
-        idp = ObjectId.ObjectID(req.body.platform);
     })
 
-    //проверка существования библиотеки для данной платформы
+    //подключение
     .then(() => {
-        return db.collection('users').findOne({_id: id});
+        return GetConnection(req.app.locals.mysql);
+    })     
+    .then(connection => {
+        db = connection;
+    })
+    //подготовка sql
+    .then(() => {
+        return [
+            'INSERT INTO user_libraries',
+            '(id_user, id_platform)',
+            'VALUES',
+            `(${db.escape(id)}, ${db.escape(idp)})`
+        ].join(' ');
+    })
+    //запрос
+    .then(query => {
+        return Query(db, query);
+    })
+    //нарушение уникальности имени
+    .catch(error => {
+        if (error.code == "ER_DUP_ENTRY") {
+            throw {code: 403, data: {error: `Library with platform ${idp} is already exists`}};
+        } else if (error.code == "ER_NO_REFERENCED_ROW_2") {
+            throw {code: 404, data: {error: "User or platform not found"}};
+        } else {
+            throw error;
+        }
+    })
+    //выборка вставленной записи
+    .then(result => {
+        return result.result.insertId;
+    })
+
+    //подготовка запроса
+    .then(insId => {
+        return [
+            'SELECT',
+            [
+                'p.id as platformId',
+                'p.name as platformName',
+                'GROUP_CONCAT(IFNULL(g.id, "") SEPARATOR ";") as gameIds',
+                'GROUP_CONCAT(IFNULL(g.name, "") SEPARATOR ";") as gameNames'
+            ].join(', '),
+            'FROM user_libraries as ul',
+            'LEFT OUTER JOIN platforms as p ON ul.id_platform = p.id',
+            'LEFT OUTER JOIN user_libraries_games as ulg ON ul.id = ulg.id_user_library',
+            'LEFT OUTER JOIN games as g ON ulg.id_game = g.id',
+            `WHERE ul.id = ${db.escape(insId)}`,
+            'GROUP BY p.id, p.name'
+        ].join(' ');
+    })
+    //запрос
+    .then(query => {
+        return Query(db, query);
     })
     .then(result => {
-        if (!result) {
-            throw {code: 404, data: {error: "User not found"}};
-        } else {
-            return result.libraries.find(i => i.platform._id.equals(idp));
-        }
-    })
-    .then(platform => {
-        if (platform) {
-            throw {code: 403, data: {error: `Library with platform ${idp.toString()} is already exists`}};
-        }
-    })
-
-    //запрос плафтормы
-    .then(() => {
-        return db.collection('platforms').findOne({_id: idp});
-    })
-    .then(result => {
-        if (!result) {
-            throw {code: 404, data: {error: "Platform not found"}};
-        } else {
-            return result;
-        }
-    })
-
-    //создание объекта
-    .then(platform => {
+        let el = result.result[0];
+        let gameIds = el.gameIds ? el.gameIds.split(';').map(i => i ? i : null) : [];
+        let gameNames = el.gameNames ? el.gameNames.split(';').map(i => i ? i : null) : [];
         let obj = {
             platform: {
-                _id: platform._id,
-                name: platform.name
+                _id: el.platformId,
+                name: el.platformName
             },
             games: []
         };
+        for (let i = 0; i < gameIds.length; i++) {
+            let game = {
+                _id: gameIds[i],
+                name: gameNames[i]
+            };
+            obj.games.push(game);
+        }
         return obj;
     })
-
-    //добавление объекта
-    .then(obj => {
-        return db.collection('users').updateOne({_id: id}, {$addToSet: {libraries: obj}});
-    })
     .then(result => {
-        if (result.matchedCount == 0) {
-            throw {code: 404, data: {error: "User not found"}};
-        } else {
-            return db.collection('users').findOne({_id: id});
-        }
+        res.send(result);
     })
-    .then(user => {
-        return user.libraries.find(i => i.platform._id.equals(idp));
-    })
-    .then(library => {
-        res.send(library);
-    })  
 
     //ошибки
     .catch(error => {
@@ -863,38 +954,49 @@ router.put('/:id/libraries', (req, res) => {
 });
 
 router.delete('/:id/libraries/:idp', (req, res) => {
-    let db = req.app.locals.mongo;
+    let db;
     let id, idp;
 
     Promise.resolve()
     //валидация id
     .then(() => {
-        if (!ObjectId.isValid(req.params.id)) {
+        id = parseInt(req.params.id);
+        if (isNaN(id)) {
             throw {code: 400, data: {error: `User id: ${req.params.id} is invalid`}};
-        } else {
-            id = ObjectId.ObjectID(req.params.id);
         }
     })
     .then(() => {
-        if (!ObjectId.isValid(req.params.idp)) {
+        idp = parseInt(req.params.idp);
+        if (isNaN(idp)) {
             throw {code: 400, data: {error: `Platform id: ${req.params.idp} is invalid`}};
-        } else {
-            idp = ObjectId.ObjectID(req.params.idp);
         }
     })
 
-    //запрос
+    //подключение
     .then(() => {
-        return db.collection('users').updateOne({_id: id}, {$pull: {libraries: {"platform._id": idp}}});
+        return GetConnection(req.app.locals.mysql);
+    })     
+    .then(connection => {
+        db = connection;
+    })
+
+    //подготовка sql
+    .then(() => {
+        return [
+            'DELETE FROM user_libraries',
+            `WHERE id_user = ${db.escape(id)} AND id_platform = ${db.escape(idp)}`
+        ].join(' ');
+    })
+    //запрос
+    .then(query => {
+        return Query(db, query);
     })
     .then(result => {
-        if (result.matchedCount === 0) {
-            throw {code: 404, data: {error: "User not found"}};
+        if (result.result.affectedRows === 0) {
+            throw {code: 404, data: {error: "User or platform not found"}};
+        } else {
+            res.send({success: true});
         }
-        if (result.modifiedCount === 0) {
-            throw {code: 404, data: {error: "Library not found"}};
-        }
-        res.send({success: true});
     })
 
     //ошибки

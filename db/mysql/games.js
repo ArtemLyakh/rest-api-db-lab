@@ -702,7 +702,7 @@ router.get('/:id/releases', (req, res) => {
 
 router.get('/:id/releases/:idp', (req, res) => {
     let db;
-    let id;
+    let id, idp;
 
     Promise.resolve()
     //валидация id
