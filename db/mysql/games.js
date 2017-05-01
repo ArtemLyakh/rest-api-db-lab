@@ -640,37 +640,54 @@ router.patch('/:id', (req, res) => {
 
 
 
-
-
-
-
-
-
-
 router.get('/:id/releases', (req, res) => {
-    let db = req.app.locals.mongo;
+    let db;
     let id;
 
     Promise.resolve()
     //валидация id
     .then(() => {
-        if (!ObjectId.isValid(req.params.id)) {
+        id = parseInt(req.params.id);
+        if (isNaN(id)) {
             throw {code: 400, data: {error: `Game id: ${req.params.id} is invalid`}};
-        } else {
-            id = ObjectId.ObjectID(req.params.id);
         }
     })
 
-    //запрос
+    //подключение
     .then(() => {
-        return db.collection('games').findOne({_id: id});
+        return GetConnection(req.app.locals.mysql);
+    })     
+    .then(connection => {
+        db = connection;
+    })
+    //подготовка запроса
+    .then(() => {
+        return [
+            'SELECT',
+            [
+                'gr.price as price',
+                'gr.date as date',
+                'p.id as platformId',
+                'p.name as platformName'
+            ].join(', '),
+            'FROM games_releases AS gr',
+            'LEFT OUTER JOIN platforms as p ON gr.id_platform = p.id',
+            `WHERE gr.id_game = ${db.escape(id)}`
+        ].join(' ');
+    })
+    //запрос
+    .then(query => {
+        return Query(db, query);
     })
     .then(result => {
-        if (!result) {
-            throw {code: 404, data: {error: "Game not found"}};
-        } else {
-            return result.releases;
-        }
+        return result.result.map(el => ({
+            platform: {
+                _id: el.platformId,
+                name: el.platformName
+            },
+            price: el.price,
+            date: el.date
+        }))
     })
     .then(result => {
         res.send(result);
@@ -691,48 +708,67 @@ router.get('/:id/releases', (req, res) => {
 });
 
 router.get('/:id/releases/:idp', (req, res) => {
-    let db = req.app.locals.mongo;
-    let id, idp;
+    let db;
+    let id;
 
     Promise.resolve()
     //валидация id
     .then(() => {
-        if (!ObjectId.isValid(req.params.id)) {
+        id = parseInt(req.params.id);
+        if (isNaN(id)) {
             throw {code: 400, data: {error: `Game id: ${req.params.id} is invalid`}};
-        } else {
-            id = ObjectId.ObjectID(req.params.id);
         }
     })
     .then(() => {
-        if (!ObjectId.isValid(req.params.idp)) {
+        idp = parseInt(req.params.idp);
+        if (isNaN(idp)) {
             throw {code: 400, data: {error: `Platform id: ${req.params.idp} is invalid`}};
-        } else {
-            idp = ObjectId.ObjectID(req.params.idp);
         }
     })
 
-    //запрос
+    //подключение
     .then(() => {
-        return db.collection('games').findOne({_id: id});
+        return GetConnection(req.app.locals.mysql);
+    })     
+    .then(connection => {
+        db = connection;
+    })
+    //подготовка запроса
+    .then(() => {
+        return [
+            'SELECT',
+            [
+                'gr.price as price',
+                'gr.date as date',
+                'p.id as platformId',
+                'p.name as platformName'
+            ].join(', '),
+            'FROM games_releases AS gr',
+            'LEFT OUTER JOIN platforms as p ON gr.id_platform = p.id',
+            `WHERE gr.id_game = ${db.escape(id)} AND gr.id_platform = ${db.escape(idp)}`
+        ].join(' ');
+    })
+    //запрос
+    .then(query => {
+        return Query(db, query);
     })
     .then(result => {
-        if (!result) {
-            throw {code: 404, data: {error: "Game not found"}};
+        if (result.result.length === 0) {
+            throw {code: 404, data: {error: "Game or platform not found"}};
         } else {
-            return result.releases;
+            let el = result.result[0];
+            return {
+                platform: {
+                    _id: el.platformId,
+                    name: el.platformName
+                },
+                price: el.price,
+                date: el.date
+            };
         }
     })
-
-    //поиск релиза
-    .then(releases => {
-        return releases.find(i => i.platform._id.equals(idp));
-    })
-    .then(release => {
-        if (!release) {
-            throw {code: 404, data: {error: "Platform not found"}};
-        } else {
-            res.send(release);
-        }
+    .then(result => {
+        res.send(result);
     })
 
     //ошибки
@@ -750,16 +786,16 @@ router.get('/:id/releases/:idp', (req, res) => {
 });
 
 router.put('/:id/releases', (req, res) => {
-    let db = req.app.locals.mongo;
+    let db;
     let id, idp;
+    let obj = {};
 
     Promise.resolve()
     //валидация id
     .then(() => {
-        if (!ObjectId.isValid(req.params.id)) {
+        id = parseInt(req.params.id);
+        if (isNaN(id)) {
             throw {code: 400, data: {error: `Game id: ${req.params.id} is invalid`}};
-        } else {
-            id = ObjectId.ObjectID(req.params.id);
         }
     })
 
@@ -768,16 +804,17 @@ router.put('/:id/releases', (req, res) => {
         if (!req.body.platform) {
             throw {code: 400, data: {error:"Parameter platform is required"}};
         }
-        if (!ObjectId.isValid(req.body.platform)) {
+        idp = parseInt(req.body.platform);
+        if (isNaN(idp)) {
             throw {code: 400, data: {error: `Platform id: ${req.body.platform} is invalid`}};
-        }
-        idp = ObjectId.ObjectID(req.body.platform);
+        }        
     })
     .then(() => {
         if (req.body.price) {
             if (typeof(req.body.price) != "number") {
                 throw {code: 400, data: {error: "Parameter price has to be a number"}};
             }
+            obj.price = req.body.price;
         }
     })
     .then(() => {
@@ -785,71 +822,78 @@ router.put('/:id/releases', (req, res) => {
             if (typeof(req.body.date) != "number") {
                 throw {code: 400, data: {error: "Parameter date has to be a number (Unix timestamp)"}};
             }
+            obj.date = req.body.date;
         }
     })
 
-    //проверка существования релиза для данной платформы
+    //подключение
     .then(() => {
-        return db.collection('games').findOne({_id: id});
+        return GetConnection(req.app.locals.mysql);
+    })     
+    .then(connection => {
+        db = connection;
     })
-    .then(result => {
-        if (!result) {
-            throw {code: 404, data: {error: "Game not found"}};
-        } else {
-            return result.releases.find(i => i.platform._id.equals(idp));
-        }
-    })
-    .then(platform => {
-        if (platform) {
-            throw {code: 403, data: {error: `Release with platform ${idp.toString()} is already exists`}};
-        }
-    })
-
-
-    //запрос плафтормы
+    //подготовка sql
     .then(() => {
-        return db.collection('platforms').findOne({_id: idp});
+        return [
+            'INSERT INTO games_releases',
+            '(id_game, id_platform, price, date)',
+            'VALUES',
+            `(${db.escape(id)}, ${db.escape(idp)}, ${db.escape(obj.price)}, ${db.escape(obj.date)})`
+        ].join(' ');
     })
-    .then(result => {
-        if (!result) {
-            throw {code: 404, data: {error: "Platform not found"}};
-        } else {
-            return result;
-        }
-    })
-
-    //создание объекта
-    .then(platform => {
-        obj = {
-            platform: {
-                _id: platform._id,
-                name: platform.name
-            }
-        };
-        if (req.body.price) obj.price = req.body.price;
-        if (req.body.date) obj.date = req.body.date;
-
-        return obj;
-    })
-
     //запрос
-    .then(obj => {
-        return db.collection('games').updateOne({_id: id}, {$addToSet: {releases: obj}});
+    .then(query => {
+        return Query(db, query);
     })
-    .then(result => {
-        if (result.matchedCount == 0) {
-            throw {code: 404, data: {error: "Game not found"}};
+    //нарушение уникальности имени
+    .catch(error => {
+        if (error.code == "ER_DUP_ENTRY") {
+            throw {code: 403, data: {error: `Release with platform ${idp} is already exists`}};
+        } else if (error.code == "ER_NO_REFERENCED_ROW_2") {
+            throw {code: 404, data: {error: "Game or platform not found"}};
         } else {
-            return db.collection('games').findOne({_id: id});
+            throw error;
         }
     })
-    .then(game => {
-        return game.releases.find(i => i.platform._id.equals(idp));
+    //выборка вставленной записи
+    .then(result => {
+        return result.result.insertId;
     })
-    .then(release => {
-        res.send(release);
-    })  
 
+    //подготовка запроса
+    .then(insId => {
+        return [
+            'SELECT',
+            [
+                'gr.price as price',
+                'gr.date as date',
+                'p.id as platformId',
+                'p.name as platformName'
+            ].join(', '),
+            'FROM games_releases AS gr',
+            'LEFT OUTER JOIN platforms as p ON gr.id_platform = p.id',
+            `WHERE gr.id = ${db.escape(insId)}`
+        ].join(' ');
+    })
+    //запрос
+    .then(query => {
+        return Query(db, query);
+    })
+    .then(result => {
+        let el = result.result[0];
+        return {
+            platform: {
+                _id: el.platformId,
+                name: el.platformName
+            },
+            price: el.price,
+            date: el.date
+        };
+    })
+    .then(result => {
+        res.send(result);
+    })
 
     //ошибки
     .catch(error => {
@@ -866,38 +910,49 @@ router.put('/:id/releases', (req, res) => {
 });
 
 router.delete('/:id/releases/:idp', (req, res) => {
-    let db = req.app.locals.mongo;
+    let db;
     let id, idp;
 
     Promise.resolve()
     //валидация id
     .then(() => {
-        if (!ObjectId.isValid(req.params.id)) {
+        id = parseInt(req.params.id);
+        if (isNaN(id)) {
             throw {code: 400, data: {error: `Game id: ${req.params.id} is invalid`}};
-        } else {
-            id = ObjectId.ObjectID(req.params.id);
         }
     })
     .then(() => {
-        if (!ObjectId.isValid(req.params.idp)) {
+        idp = parseInt(req.params.idp);
+        if (isNaN(idp)) {
             throw {code: 400, data: {error: `Platform id: ${req.params.idp} is invalid`}};
-        } else {
-            idp = ObjectId.ObjectID(req.params.idp);
         }
     })
 
-    //запрос
+    //подключение
     .then(() => {
-        return db.collection('games').updateOne({_id: id}, {$pull: {releases: {"platform._id": idp}}});
+        return GetConnection(req.app.locals.mysql);
+    })     
+    .then(connection => {
+        db = connection;
+    })
+
+    //подготовка sql
+    .then(() => {
+        return [
+            'DELETE FROM games_releases',
+            `WHERE id_game = ${db.escape(id)} AND id_platform = ${db.escape(idp)}`
+        ].join(' ');
+    })
+    //запрос
+    .then(query => {
+        return Query(db, query);
     })
     .then(result => {
-        if (result.matchedCount === 0) {
-            throw {code: 404, data: {error: "Game not found"}};
+        if (result.result.affectedRows === 0) {
+            throw {code: 404, data: {error: "Game or platform not found"}};
+        } else {
+            res.send({success: true});
         }
-        if (result.modifiedCount === 0) {
-            throw {code: 404, data: {error: "Platform not found"}};
-        }
-        res.send({success: true});
     })
 
     //ошибки
@@ -916,24 +971,22 @@ router.delete('/:id/releases/:idp', (req, res) => {
 });
 
 router.patch('/:id/releases/:idp', (req, res) => {
-    let db = req.app.locals.mongo;
+    let db;
     let id, idp;
     let obj = {};
 
     Promise.resolve()
     //валидация id
     .then(() => {
-        if (!ObjectId.isValid(req.params.id)) {
+        id = parseInt(req.params.id);
+        if (isNaN(id)) {
             throw {code: 400, data: {error: `Game id: ${req.params.id} is invalid`}};
-        } else {
-            id = ObjectId.ObjectID(req.params.id);
         }
     })
     .then(() => {
-        if (!ObjectId.isValid(req.params.idp)) {
+        idp = parseInt(req.params.idp);
+        if (isNaN(idp)) {
             throw {code: 400, data: {error: `Platform id: ${req.params.idp} is invalid`}};
-        } else {
-            idp = ObjectId.ObjectID(req.params.idp);
         }
     })
 
@@ -971,30 +1024,66 @@ router.patch('/:id/releases/:idp', (req, res) => {
         }
     })
 
-    //формирование объекта для обновления
+    //подключение
     .then(() => {
-        let upd = {};
-        for (let i in obj) {
-            upd[`releases.$.${i}`] = obj[i];
-        }
-        return {$set: upd};
+        return GetConnection(req.app.locals.mysql);
+    })     
+    .then(connection => {
+        db = connection;
     })
-
+    //подготовка sql
+    .then(() => {
+        return [
+            'UPDATE games_releases SET',
+            Object.keys(obj).map(i => `${i} = ${db.escape(obj[i])}`).join(', '),
+            `WHERE id_game = ${db.escape(id)} AND id_platform = ${db.escape(idp)}`
+        ].join(' ');
+    })
     //запрос
-    .then(upd => {
-        return db.collection('games').updateOne({_id: id, "releases.platform._id": idp}, upd);
-    })
+    .then(query => {
+        return Query(db, query);
+    })    
     .then(result => {
-        if (result.matchedCount === 0) {
+        if (result.result.affectedRows === 0) {
             throw {code: 404, data: {error: "Game or platform not found"}};
         }
-        return db.collection('games').findOne({_id: id});
+    })  
+    //выборка вставленной записи
+    .then(() => {
+        return [
+            'SELECT',
+            [
+                'gr.price as price',
+                'gr.date as date',
+                'p.id as platformId',
+                'p.name as platformName'
+            ].join(', '),
+            'FROM games_releases AS gr',
+            'LEFT OUTER JOIN platforms as p ON gr.id_platform = p.id',
+            `WHERE gr.id_game = ${db.escape(id)} AND gr.id_platform = ${db.escape(idp)}`
+        ].join(' ');
+    })
+    //запрос
+    .then(query => {
+        return Query(db, query);
     })
     .then(result => {
-        return result.releases.find(i => i.platform._id.equals(idp));
+        if (result.result.length === 0) {
+            throw {code: 404, data: {error: "Game or platform not found"}};
+        } else {
+            let el = result.result[0];
+            return {
+                platform: {
+                    _id: el.platformId,
+                    name: el.platformName
+                },
+                price: el.price,
+                date: el.date
+            };
+        }
     })
-    .then(release => {
-        res.send(release);
+    .then(result => {
+        res.send(result);
     })
 
     //ошибки
