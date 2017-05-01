@@ -144,10 +144,10 @@ router.get('/', (req, res) => {
     })
     .then(result => {
         return result.result.map(el => {
-            let prices = el.prices.split(';').map(i => i ? i : null);
-            let dates = el.dates.split(';').map(i => i ? i : null);
-            let platformIds = el.platformIds.split(';').map(i => i ? i : null);
-            let platformNames = el.platformNames.split(';').map(i => i ? i : null);
+            let prices = el.prices ? el.prices.split(';').map(i => i ? i : null) : [];
+            let dates = el.dates ? el.dates.split(';').map(i => i ? i : null) : [];
+            let platformIds = el.platformIds ? el.platformIds.split(';').map(i => i ? i : null) : [];
+            let platformNames = el.platformNames ? el.platformNames.split(';').map(i => i ? i : null) : [];
             let obj = {
                 _id: el.id,
                 name: el.name,
@@ -237,10 +237,10 @@ router.get('/:id', (req, res) => {
             throw {code: 404, data: {error: "Game not found"}};
         } else {
             let el = result.result[0];
-            let prices = el.prices.split(';').map(i => i ? i : null);
-            let dates = el.dates.split(';').map(i => i ? i : null);
-            let platformIds = el.platformIds.split(';').map(i => i ? i : null);
-            let platformNames = el.platformNames.split(';').map(i => i ? i : null);
+            let prices = el.prices ? el.prices.split(';').map(i => i ? i : null) : [];
+            let dates = el.dates ? el.dates.split(';').map(i => i ? i : null) : [];
+            let platformIds = el.platformIds ? el.platformIds.split(';').map(i => i ? i : null) : [];
+            let platformNames = el.platformNames ? el.platformNames.split(';').map(i => i ? i : null) : [];
             let obj = {
                 _id: el.id,
                 name: el.name,
@@ -248,17 +248,15 @@ router.get('/:id', (req, res) => {
                 rating: el.rating,
                 releases: []
             };
-            if (platformIds.length > 1) {
-                for (let i = 0; i < platformIds.length; i++) {
-                    obj.releases.push({
-                        platform: {
-                            _id: platformIds[i],
-                            name: platformNames[i]
-                        },
-                        price: prices[i],
-                        date: dates[i]
-                    });
-                }
+            for (let i = 0; i < platformIds.length; i++) {
+                obj.releases.push({
+                    platform: {
+                        _id: platformIds[i],
+                        name: platformNames[i]
+                    },
+                    price: prices[i],
+                    date: dates[i]
+                });
             }
             return obj;
         }
@@ -379,10 +377,10 @@ router.put('/', (req, res) => {
     })
     .then(result => {
         let el = result.result[0];
-        let prices = el.prices.split(';').map(i => i ? i : null);
-        let dates = el.dates.split(';').map(i => i ? i : null);
-        let platformIds = el.platformIds.split(';').map(i => i ? i : null);
-        let platformNames = el.platformNames.split(';').map(i => i ? i : null);
+        let prices = el.prices ? el.prices.split(';').map(i => i ? i : null) : [];
+        let dates = el.dates ? el.dates.split(';').map(i => i ? i : null) : [];
+        let platformIds = el.platformIds ? el.platformIds.split(';').map(i => i ? i : null) : [];
+        let platformNames = el.platformNames ? el.platformNames.split(';').map(i => i ? i : null) : [];
         let obj = {
             _id: el.id,
             name: el.name,
@@ -390,17 +388,15 @@ router.put('/', (req, res) => {
             rating: el.rating,
             releases: []
         };
-        if (platformIds.length > 1) {
-            for (let i = 0; i < platformIds.length; i++) {
-                obj.releases.push({
-                    platform: {
-                        _id: platformIds[i],
-                        name: platformNames[i]
-                    },
-                    price: prices[i],
-                    date: dates[i]
-                });
-            }
+        for (let i = 0; i < platformIds.length; i++) {
+            obj.releases.push({
+                platform: {
+                    _id: platformIds[i],
+                    name: platformNames[i]
+                },
+                price: prices[i],
+                date: dates[i]
+            });
         }
         return obj;
     })
@@ -423,7 +419,7 @@ router.put('/', (req, res) => {
 });
 
 router.delete('/:id', (req, res) => {
-    let db = req.app.locals.mongo;
+    let db;
     let id;
 
     Promise.resolve()
@@ -559,7 +555,6 @@ router.patch('/:id', (req, res) => {
             throw error;
         }
     })
-    //выборка вставленной записи
     .then(result => {
         if (result.result.affectedRows === 0) {
             throw {code: 404, data: {error: "Platform not found"}};
@@ -592,10 +587,10 @@ router.patch('/:id', (req, res) => {
     })
     .then(result => {
         let el = result.result[0];
-        let prices = el.prices.split(';').map(i => i ? i : null);
-        let dates = el.dates.split(';').map(i => i ? i : null);
-        let platformIds = el.platformIds.split(';').map(i => i ? i : null);
-        let platformNames = el.platformNames.split(';').map(i => i ? i : null);
+        let prices = el.prices ? el.prices.split(';').map(i => i ? i : null) : [];
+        let dates = el.dates ? el.dates.split(';').map(i => i ? i : null) : [];
+        let platformIds = el.platformIds ? el.platformIds.split(';').map(i => i ? i : null) : [];
+        let platformNames = el.platformNames ? el.platformNames.split(';').map(i => i ? i : null) : [];
         let obj = {
             _id: el.id,
             name: el.name,
@@ -603,17 +598,15 @@ router.patch('/:id', (req, res) => {
             rating: el.rating,
             releases: []
         };
-        if (platformIds.length > 1) {
-            for (let i = 0; i < platformIds.length; i++) {
-                obj.releases.push({
-                    platform: {
-                        _id: platformIds[i],
-                        name: platformNames[i]
-                    },
-                    price: prices[i],
-                    date: dates[i]
-                });
-            }
+        for (let i = 0; i < platformIds.length; i++) {
+            obj.releases.push({
+                platform: {
+                    _id: platformIds[i],
+                    name: platformNames[i]
+                },
+                price: prices[i],
+                date: dates[i]
+            });
         }
         return obj;
     })
