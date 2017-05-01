@@ -3,6 +3,7 @@ const MongoClient = require('mongodb').MongoClient;
 const mysql = require('mysql');
 const config = require('./config');
 const mongoRouter = require('./db/mongo/routes.js');
+const mysqlRouter = require('./db/mysql/routes.js');
 
 const app = express();
 
@@ -72,7 +73,7 @@ app.get('/mysql', (req, res) => {
 });
 
 app.use('/mongo', mongoRouter);
-
+app.use('/mysql', mysqlRouter);
 
 
 app.listen(app.get('port'), function() {
