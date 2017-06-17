@@ -183,7 +183,7 @@ router.put('/', (req, res) => {
         return db.collection('platforms').insert(obj);
     })
     .then(result => {
-        res.send(result.ops);
+        res.send(result.ops[0]);
     })
     
 

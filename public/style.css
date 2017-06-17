@@ -1,0 +1,15 @@
+.api_table {
+    border-collapse: collapse;
+    margin: 0 auto;
+    width: 90%;
+}
+.api_table td {
+    border: 1px solid black;
+    text-align: center;
+}
+.api_table td:first-child {
+    text-align: left;
+}
+.api_table tr:not(:first-child) td:empty::before{
+    content: "\2014";
+}

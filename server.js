@@ -31,8 +31,8 @@ app.use(express.static(__dirname + '/public'));
 app.use('/mongo', mongoRouter);
 app.use('/mysql', mysqlRouter);
 
-app.listen(app.get('port'), function() {
-  console.log('Node app is running on port', app.get('port'));
+app.listen(app.get('port'), () => {
+    console.log('Node app is running on port', app.get('port'));
 });
 
 

@@ -201,7 +201,7 @@ router.put('/', (req, res) => {
         return db.collection('games').insert(obj);
     })
     .then(result => {
-        res.send(result.ops);
+        res.send(result.ops[0]);
     })
 
     //ошибки
@@ -551,7 +551,9 @@ router.put('/:id/releases', (req, res) => {
             }
         };
         if (req.body.price) obj.price = req.body.price;
+        else obj.price = null;
         if (req.body.date) obj.date = req.body.date;
+        else obj.date = null;
 
         return obj;
     })
