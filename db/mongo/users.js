@@ -150,7 +150,7 @@ router.put('/', (req, res) => {
         return db.collection('users').insert(obj);
     })
     .then(result => {
-        res.send(result.ops);
+        res.send(result.ops[0]);
     })
 
     //ошибки
