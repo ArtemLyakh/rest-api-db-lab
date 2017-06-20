@@ -118,7 +118,7 @@ router.get('/', (req, res) => {
             let obj = {
                 _id: el.id,
                 name: el.name,
-                pasword: el.password,
+                password: el.password,
                 libraries: []
             };
             for (let i = 0; i < platformIds.length; i++) {
@@ -233,7 +233,7 @@ router.get('/:id', (req, res) => {
             let obj = {
                 _id: el.id,
                 name: el.name,
-                pasword: el.password,
+                password: el.password,
                 libraries: []
             };
             for (let i = 0; i < platformIds.length; i++) {
@@ -383,7 +383,7 @@ router.put('/', (req, res) => {
         let obj = {
             _id: el.id,
             name: el.name,
-            pasword: el.password,
+            password: el.password,
             libraries: []
         };
         for (let i = 0; i < platformIds.length; i++) {
@@ -610,7 +610,7 @@ router.patch('/:id', (req, res) => {
             let obj = {
                 _id: el.id,
                 name: el.name,
-                pasword: el.password,
+                password: el.password,
                 libraries: []
             };
             for (let i = 0; i < platformIds.length; i++) {
